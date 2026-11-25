@@ -1,0 +1,13 @@
+.DS_Store
+__pycache__/
+*.py[cod]
+*.so
+build/
+dist/
+.venv/
+*.log
+*.jsonl
+data/
+raw_results/
+.env
+.env.*
