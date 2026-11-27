@@ -349,18 +349,18 @@ def make_fig4() -> Path:
     }
     names = [label_map.get(k, k) for k, _ in picked]
     vals = [abs(v) for _, v in picked]
-    colors = [PAL["rose_fill"] if v >= 0.85 else PAL["peri_fill"] for v in vals]
-    edges = [PAL["rose_edge"] if v >= 0.85 else PAL["peri_edge"] for v in vals]
+    colors = [PAL["rose_fill"] if v >= 0.70 else PAL["peri_fill"] for v in vals]
+    edges = [PAL["rose_edge"] if v >= 0.70 else PAL["peri_edge"] for v in vals]
 
     yp = np.arange(len(names))
     bars = ax2.barh(yp, vals, height=0.62, color=colors, edgecolor=PAL["ink"], linewidth=0.6)
-    ax2.axvline(0.85, color=PAL["rose_edge"], linestyle="--", linewidth=1.1)
-    ax2.text(0.89, 0.75, "Gate 2\n(|\u03c1|=0.85)", ha="left", va="bottom", fontsize=8.0,
+    ax2.axvline(0.70, color=PAL["rose_edge"], linestyle="--", linewidth=1.1)
+    ax2.text(0.74, 0.75, "Gate 2\n(|\u03c1|=0.70)", ha="left", va="bottom", fontsize=8.0,
              fontweight="bold", color=PAL["rose_edge"])
     for b, v, ec in zip(bars, vals, edges):
         ax2.text(v + 0.03, b.get_y() + b.get_height() / 2, f"{v:.3f}",
-                 va="center", ha="left", fontsize=8.0, color=ec if v >= 0.85 else PAL["ink"],
-                 fontweight="bold" if v >= 0.85 else "normal")
+                 va="center", ha="left", fontsize=8.0, color=ec if v >= 0.70 else PAL["ink"],
+                 fontweight="bold" if v >= 0.70 else "normal")
     ax2.set_yticks(yp)
     ax2.set_yticklabels(names, fontsize=8.0)
     ax2.set_xlabel(r"Spearman $|\rho(f, j)|$")
@@ -386,7 +386,7 @@ def make_fig4() -> Path:
     ax3.text(92, 0.22, "4.4\u20134.5\u00d7\n4w/1w", fontsize=8.0, ha="right", va="bottom", color=PAL["gray_edge"], style="italic")
     ax3.set_yticks(yc)
     ax3.set_yticklabels([trace_disp[r["trace"]] for r in cf_sorted], fontsize=8.0)
-    ax3.set_xlabel("1w vs. 4w Pairwise Flip %")
+    ax3.set_xlabel("1w vs. 4w Flip (%)")
     ax3.set_xlim(0, 96)
     ax3.set_ylim(-0.6, 4.6)
     panel_tag(ax3, "C", x=-0.42, y=1.22)
@@ -480,8 +480,8 @@ def make_fig5() -> Path:
 # ---------------------------------------------------------------------------
 def make_fig6() -> Path:
     fig, (ax1, ax2, ax3) = plt.subplots(
-        1, 3, figsize=(6.80, 2.28),
-        gridspec_kw={"width_ratios": [1.05, 1.15, 1.05], "wspace": 0.48},
+        1, 3, figsize=(6.95, 2.02),
+        gridspec_kw={"width_ratios": [0.98, 1.25, 1.30], "wspace": 0.44},
     )
 
     rates = [0, 10, 20, 30, 50]
@@ -496,15 +496,15 @@ def make_fig6() -> Path:
     ax1.plot(xp, r_cpus, marker="D", markersize=4.3, linewidth=1.6, color=PAL["mint_edge"], label="Past-QMass (Refresh)")
     ax1.fill_between(xp, r_cpus, m_cpus, where=np.array(r_cpus) <= np.array(m_cpus),
                      interpolate=True, color=PAL["mint_fill"], alpha=0.55)
-    ax1.annotate("-17.0%\n(245 vs 296s)", xy=(2, r_cpus[2]), xytext=(1.32, 193),
-                 fontsize=8.0, fontweight="bold", color=PAL["mint_edge"], ha="center",
+    ax1.annotate("-17.0%\n(245 vs 296s)", xy=(2, r_cpus[2]), xytext=(1.35, 191),
+                 fontsize=8.3, fontweight="bold", color=PAL["mint_edge"], ha="center",
                  arrowprops=dict(arrowstyle="->", color=PAL["mint_edge"], lw=0.8, shrinkB=3))
     ax1.set_xticks(xp)
-    ax1.set_xticklabels([f"{r}%" for r in rates], fontsize=8.0)
-    ax1.set_xlabel("CRUD Deletion Rate")
-    ax1.set_ylabel("Total CPU Time (s)")
-    ax1.set_ylim(178, 336)
-    ax1.legend(loc="lower center", bbox_to_anchor=(0.50, 1.01), ncol=1, fontsize=8.0, handlelength=1.1, labelspacing=0.16)
+    ax1.set_xticklabels([f"{r}%" for r in rates], fontsize=8.3)
+    ax1.set_xlabel("CRUD Deletion Rate", fontsize=8.6)
+    ax1.set_ylabel("Total CPU Time (s)", fontsize=8.6)
+    ax1.set_ylim(174, 338)
+    ax1.legend(loc="lower center", bbox_to_anchor=(0.50, 1.01), ncol=1, fontsize=8.2, handlelength=1.1, labelspacing=0.14)
     panel_tag(ax1, "A", x=-0.22, y=1.18)
 
     us = [2, 5, 10, 20]
@@ -517,23 +517,32 @@ def make_fig6() -> Path:
                 d = pd.read_csv(fp)
             else:
                 d = pd.read_csv(RES / "sift100k_canon25" / "exact_ops_and_dp.csv")
+            if "wall_cpu_ratio" in d.columns:
+                d = d[d["wall_cpu_ratio"] <= 1.18]  # Gate 4: CPU only from unflagged runs
             g = d.groupby("arm")["total_cpu_ms"].mean()
-            mat[i, j] = (float(g["noop"]) - float(g["past_qmass_sp1"])) / float(g["noop"]) * 100.0
+            if "noop" in g.index and "past_qmass_sp1" in g.index:
+                mat[i, j] = (float(g["noop"]) - float(g["past_qmass_sp1"])) / float(g["noop"]) * 100.0
+            else:
+                mat[i, j] = np.nan
 
     cmap = LinearSegmentedColormap.from_list("mint_soft", ["#F2FAF7", "#77D6C7", "#2F868D"])
-    ax2.imshow(mat, cmap=cmap, aspect="auto", vmin=10.0, vmax=40.0)
+    cmap.set_bad("#E4E4E8")
+    ax2.imshow(np.ma.masked_invalid(mat), cmap=cmap, aspect="auto", vmin=10.0, vmax=45.0)
     for i in range(len(us)):
         for j in range(len(qs)):
             val = mat[i, j]
-            txt_col = "#FFFFFF" if val >= 32.0 else PAL["ink"]
-            ax2.text(j, i, f"{val:.1f}%", ha="center", va="center", fontsize=8.0, fontweight="bold", color=txt_col)
+            if np.isnan(val):
+                ax2.text(j, i, "flag", ha="center", va="center", fontsize=7.9, style="italic", color=PAL["ink"])
+                continue
+            txt_col = "#FFFFFF" if val >= 34.0 else PAL["ink"]
+            ax2.text(j, i, f"{val:.1f}%", ha="center", va="center", fontsize=7.9, fontweight="bold", color=txt_col)
     ax2.set_xticks(np.arange(len(qs)))
-    ax2.set_xticklabels([str(q) for q in qs], fontsize=8.0)
+    ax2.set_xticklabels([str(q) for q in qs], fontsize=8.3)
     ax2.set_yticks(np.arange(len(us)))
-    ax2.set_yticklabels([f"{u}%" for u in us], fontsize=8.0)
-    ax2.set_xlabel("Queries per Window (Q)")
-    ax2.set_ylabel("Insert Rate (u)")
-    ax2.set_title("% CPU Saved vs. No-Op", fontsize=8.2, pad=5, color=PAL["ink"])
+    ax2.set_yticklabels([f"{u}%" for u in us], fontsize=8.3)
+    ax2.set_xlabel("Queries per Window (Q)", fontsize=8.6)
+    ax2.set_ylabel("Insert Rate (u)", fontsize=8.6)
+    ax2.set_title("% CPU Saved vs. No-Op (Gate-4 clean)", fontsize=8.5, pad=5, color=PAL["ink"])
     ax2.spines["top"].set_visible(True)
     ax2.spines["right"].set_visible(True)
     panel_tag(ax2, "B", x=-0.22, y=1.18)
@@ -543,31 +552,52 @@ def make_fig6() -> Path:
         ("300K", RES / "sift300k" / "exact_ops_and_dp.csv"),
         ("600K", RES / "sift600k_s07" / "exact_ops_and_dp.csv"),
         ("1M", RES / "sprint_v2_llm01" / "sift1m_n12" / "exact_ops_and_dp.csv"),
-        ("Xeon", RES / "xeon_anchor" / "exact_ops_and_dp.csv"),
-        ("EPYC", RES / "epyc_anchor" / "exact_ops_and_dp.csv"),
     ]
-    c2_v, pq_v, ora_v = [], [], []
-    for _, fp in suites:
+    c2_v, pq_v, ora_v, x_lbls = [], [], [], []
+    for lbl, fp in suites:
         d = pd.read_csv(fp)
         g = d.groupby("arm")["global_capture_ratio"].mean() * 100.0
+        x_lbls.append(lbl)
         c2_v.append(float(g["fixed_c2_merge"]))
         pq_v.append(float(g["past_qmass_sp1"]))
         ora_v.append(float(g["forecast_oracle"]) if "forecast_oracle" in g.index else np.nan)
-    xs = np.arange(len(suites))
-    bw = 0.25
+
+    s2_hr_p = RES / "exp9_rust_and_scale" / "s2_headroom_100k_to_10m.csv"
+    if s2_hr_p.exists():
+        s2_hr = pd.read_csv(s2_hr_p)
+        for sc_tag, disp_tag in [("5M", "5M*"), ("10M", "10M*")]:
+            sub_h = s2_hr[s2_hr["scale"] == sc_tag].groupby("policy")["gcr_pct"].mean()
+            x_lbls.append(disp_tag)
+            c2_v.append(float(sub_h["fixed_c2"]))
+            pq_v.append(float(sub_h["ewma_a03"]))
+            ora_v.append(float(sub_h["oracle_1blk"]))
+
+    for lbl, fp in [
+        ("Xeon", RES / "xeon_anchor" / "exact_ops_and_dp.csv"),
+        ("EPYC", RES / "epyc_anchor" / "exact_ops_and_dp.csv"),
+    ]:
+        d = pd.read_csv(fp)
+        g = d.groupby("arm")["global_capture_ratio"].mean() * 100.0
+        x_lbls.append(lbl)
+        c2_v.append(float(g["fixed_c2_merge"]))
+        pq_v.append(float(g["past_qmass_sp1"]))
+        ora_v.append(np.nan)
+
+    xs = np.arange(len(x_lbls))
+    bw = 0.24
     ax3.bar(xs - bw, c2_v, width=bw, facecolor=PAL["gray_fill"], edgecolor=PAL["ink"], linewidth=0.6, label="Fixed c=2")
-    ax3.bar(xs, pq_v, width=bw, facecolor=PAL["mint_fill"], edgecolor=PAL["ink"], linewidth=0.6, label="Past-QMass")
+    ax3.bar(xs, pq_v, width=bw, facecolor=PAL["mint_fill"], edgecolor=PAL["ink"], linewidth=0.6, label="PQ / EWMA")
     ora_xs = [i for i, v in enumerate(ora_v) if not np.isnan(v)]
     ora_vals = [v for v in ora_v if not np.isnan(v)]
     ax3.bar(np.array(ora_xs) + bw, ora_vals, width=bw, facecolor=PAL["apri_fill"], edgecolor=PAL["ink"], linewidth=0.6, label="1-blk Ora.")
     ax3.axhline(100.0, color=PAL["rose_edge"], linestyle="--", linewidth=0.9, label="Prop. 1")
     ax3.set_xticks(xs)
-    ax3.set_xticklabels([s[0] for s in suites], fontsize=8.0, rotation=24, ha="right")
-    ax3.set_ylabel("Global Capture Ratio (%)")
+    ax3.set_xticklabels(x_lbls, fontsize=8.2, rotation=48, ha="right", rotation_mode="anchor")
+    ax3.set_ylabel("Global Capture Ratio (%)", fontsize=8.6)
     ax3.set_ylim(0, 114)
-    ax3.legend(loc="lower center", bbox_to_anchor=(0.50, 1.01), ncol=2, fontsize=8.0,
-               columnspacing=0.5, handlelength=0.9, labelspacing=0.16)
-    panel_tag(ax3, "C", x=-0.22, y=1.18)
+    ax3.legend(loc="lower center", bbox_to_anchor=(0.50, 1.01), ncol=2, fontsize=8.2,
+               columnspacing=0.5, handlelength=0.9, labelspacing=0.14)
+    panel_tag(ax3, "C", x=-0.18, y=1.18)
 
     return save_both(fig, "fig6_phase_tombstone_transfer")
 
@@ -594,10 +624,10 @@ def make_fig_flip_matrix() -> Path:
         ("exp6_a1d_cross_numa_8w_wall_s", "Real: Cross-NUMA 8w Wall", "Real-Engine"),
         ("exp6_a1d_mt4_vs_iso1t_wall_s", "Regime: MT-4t vs 1T Wall", "Concurrency"),
         ("exp7_arxiv_5engines_summary_arxiv_cs_minilm384_cpu_vs_att", "Real: arXiv Cost vs Att.@.965", "Real-Engine"),
-        ("colab_agnews_cpu_vs_att", "Real: AG News Cost vs Att.", "Real-Engine"),
+        ("exp9_m1_sharded_hnswlib_total_cpu_s", "Trap 2: 16-sh HNSW Bridge", "Trap 2"),
         ("colab_sift1m_drift_cpu_vs_att", "Real: 1M+F-HNSW Cost vs Att.", "Real-Engine"),
-        ("exp7_sift1m_5engines_summary_sift1m_crud30_cpu_vs_att", "Real: 1M CRUD Cost vs Att.", "Real-Engine"),
-        ("exp7_sift1m_5engines_summary_sift1m_drift_cpu_vs_att", "Real: 1M Drift Cost vs Att.", "Real-Engine"),
+        ("exp9_s2_bigann_10m_wall_vs_floor", "Real: BigANN-10M Wall vs Flr.", "Real-Engine"),
+        ("exp9_r1_a4_unmatched_cpu_vs_att", "Real: Rust A4 Cost vs Att.", "Real-Engine"),
         ("exp6_a3_crud_cpu_vs_attainment", "Real: CRUD CPU vs Att.@.965", "Real-Engine"),
         ("exp6_a4_unmatched_cpu_vs_attainment", "Real: Unmatched CPU vs Att.", "Real-Engine"),
     ]
@@ -622,8 +652,8 @@ def make_fig_flip_matrix() -> Path:
     }
 
     fig, (ax1, ax2) = plt.subplots(
-        1, 2, figsize=(6.45, 2.86),
-        gridspec_kw={"width_ratios": [1.32, 1.02], "wspace": 0.44},
+        1, 2, figsize=(6.85, 2.92),
+        gridspec_kw={"width_ratios": [1.26, 1.12], "wspace": 0.42},
     )
 
     y = np.arange(len(sub))
@@ -634,13 +664,13 @@ def make_fig_flip_matrix() -> Path:
         ax1.hlines(idx, 0, r["pairwise_flip_pct"], color=ec, linewidth=1.7, zorder=2)
         ax1.scatter(r["pairwise_flip_pct"], idx, s=36, marker=mk, facecolor=fc, edgecolor=PAL["ink"], linewidth=0.7, zorder=4)
         frac = f"{r['pairwise_flip_pct']:.1f}% ({int(r['pair_flips'])}/{int(r['total_pairs'])})"
-        ax1.text(r["pairwise_flip_pct"] + 4.0, idx, frac, va="center", ha="left", fontsize=8.1, color=PAL["ink"])
+        ax1.text(r["pairwise_flip_pct"] + 4.0, idx, frac, va="center", ha="left", fontsize=8.3, color=PAL["ink"])
 
     ax1.set_yticks(y)
-    ax1.set_yticklabels(sub["disp"].tolist(), fontsize=8.1)
-    ax1.set_xlabel("Pairwise Policy/Engine Flip Rate (%)")
-    ax1.set_xlim(0, max(flips) + 48.0)
-    ax1.set_ylim(-0.7, len(sub) - 0.3)
+    ax1.set_yticklabels(sub["disp"].tolist(), fontsize=8.3)
+    ax1.set_xlabel("Pairwise Policy/Engine Flip Rate (%)", fontsize=8.6)
+    ax1.set_xlim(0, max(flips) + 52.0)
+    ax1.set_ylim(-0.85, len(sub) - 0.15)
     panel_tag(ax1, "A", x=-0.56, y=1.03)
 
     ax2.axvline(0.85, color=PAL["ref"], linestyle="--", linewidth=0.8, zorder=1)
@@ -654,15 +684,15 @@ def make_fig_flip_matrix() -> Path:
                     linewidth=1.0, label=tgrp, zorder=4)
 
     annot_specs = {
-        "trap1_all_local_pooled": ("Trap 1 (0%)", (0.80, -10.5), "center"),
-        "exp6_a1d_mt4_vs_iso1t_wall_s": ("MT-4t Regime\n(0%)", (-0.10, 16.0), "center"),
-        "trap2_core_canon_leakage_exp2_ops": ("Trap 2 Core\n(36.7%)", (1.03, 22.0), "center"),
-        "trap4_dirty_vs_clean_18grids": ("Trap 4 18G\n(38.9%)", (0.30, 34.0), "center"),
-        "exp6_a1d_cross_numa_8w_wall_s": ("Cross-NUMA\n8w (50%)", (0.98, 63.0), "center"),
-        "trap4_xeon_all_regimes_mean_p99_us": ("Xeon p99\n(62.5%)", (-0.22, 48.0), "center"),
-        "exp7_arxiv_minilm384_uncap_ops_and_dp_exact_scan_ops": ("arXiv Uncap\n(100%)", (0.95, 80.0), "center"),
-        "exp7_arxiv_5engines_summary_arxiv_cs_minilm384_cpu_vs_att": ("arXiv Eng.\n(100%)", (0.38, 83.0), "center"),
-        "exp6_a4_unmatched_cpu_vs_attainment": ("Floor Miss\n(100%)", (-0.16, 83.0), "center"),
+        "trap1_all_local_pooled": ("Trap 1 (0%)", (0.80, -13.0), "center"),
+        "exp6_a1d_mt4_vs_iso1t_wall_s": ("MT-4t Regime\n(0%)", (-0.22, 14.5), "center"),
+        "trap2_core_canon_leakage_exp2_ops": ("Trap 2 Core\n(36.7%)", (1.10, 24.5), "center"),
+        "trap4_dirty_vs_clean_18grids": ("Trap 4 18G\n(38.9%)", (0.20, 29.0), "center"),
+        "exp6_a1d_cross_numa_8w_wall_s": ("Cross-NUMA\n8w (50%)", (1.14, 65.0), "center"),
+        "trap4_xeon_all_regimes_mean_p99_us": ("Xeon p99\n(62.5%)", (-0.34, 56.0), "center"),
+        "exp7_arxiv_minilm384_uncap_ops_and_dp_exact_scan_ops": ("arXiv Uncap\n(100%)", (0.94, 83.5), "center"),
+        "exp7_arxiv_5engines_summary_arxiv_cs_minilm384_cpu_vs_att": ("arXiv Eng.\n(100%)", (0.20, 81.5), "center"),
+        "exp9_r1_a4_unmatched_cpu_vs_att": ("Rust A4\n(100%)", (-0.42, 81.5), "center"),
     }
     for sid, (txt, xyt, ha_v) in annot_specs.items():
         m = sub[sub["suite_id"] == sid]
@@ -670,18 +700,18 @@ def make_fig_flip_matrix() -> Path:
             r = m.iloc[0]
             ax2.annotate(
                 txt, xy=(r["kendall_tau"], r["top1_flip_pct"]), xytext=xyt,
-                ha=ha_v, va="center", fontsize=8.1, color=PAL["ink"], bbox=PAD_BOX,
+                ha=ha_v, va="center", fontsize=8.2, color=PAL["ink"], bbox=PAD_BOX,
                 arrowprops=dict(arrowstyle="-", color=PAL["gray_edge"], lw=0.6, shrinkA=0, shrinkB=4),
                 zorder=6,
             )
 
-    ax2.set_xlabel(r"Kendall's $\tau$ Rank Preservation")
-    ax2.set_ylabel("Top-1 Winner Flip Rate (%)")
-    ax2.set_xlim(-0.46, 1.28)
-    ax2.set_ylim(-18, 116)
-    ax2.legend(loc="lower center", bbox_to_anchor=(0.50, 1.01), fontsize=8.1, ncol=3,
-               columnspacing=0.45, handlelength=0.85, labelspacing=0.15)
-    panel_tag(ax2, "B", x=-0.20, y=1.12)
+    ax2.set_xlabel(r"Kendall's $\tau$ Rank Preservation", fontsize=8.6)
+    ax2.set_ylabel("Top-1 Winner Flip Rate (%)", fontsize=8.6)
+    ax2.set_xlim(-0.70, 1.44)
+    ax2.set_ylim(-21, 117)
+    ax2.legend(loc="lower center", bbox_to_anchor=(0.50, 1.01), fontsize=8.2, ncol=3,
+               columnspacing=0.45, handlelength=0.85, labelspacing=0.14)
+    panel_tag(ax2, "B", x=-0.18, y=1.12)
 
     return save_both(fig, "fig_flip_matrix")
 
@@ -704,8 +734,8 @@ def make_fig7() -> Path:
     r1_a4_g = r1_a4_g.rename(columns={"engine": "system", "config": "param_tag", "att_0965_pct": "attainment_0965_pct"})
     a4_plot = pd.concat([a4, r1_a4_g[r1_a4_g["system"] == "usearch_rust"]], ignore_index=True)
 
-    fig = plt.figure(figsize=(6.65, 2.48))
-    gs1 = fig.add_gridspec(1, 2, left=0.06, right=0.54, wspace=0.42, width_ratios=[1.02, 1.08])
+    fig = plt.figure(figsize=(7.05, 2.38))
+    gs1 = fig.add_gridspec(1, 2, left=0.06, right=0.55, wspace=0.42, width_ratios=[1.12, 1.04])
     gs2 = fig.add_gridspec(1, 1, left=0.69, right=0.98)
     ax1 = fig.add_subplot(gs1[0, 0])
     ax2 = fig.add_subplot(gs1[0, 1])
@@ -723,33 +753,33 @@ def make_fig7() -> Path:
         ax1.plot(sub["total_cpu_ms"] / 1000.0, sub["attainment_0965_pct"],
                  color=PAL["gray_edge"], linewidth=0.9, linestyle=ls, zorder=2)
         ax1.scatter(sub["total_cpu_ms"] / 1000.0, sub["attainment_0965_pct"],
-                    s=36, marker=mk, facecolor=fc, edgecolor=PAL["ink"], linewidth=0.72, zorder=4, label=lbl)
+                    s=34, marker=mk, facecolor=fc, edgecolor=PAL["ink"], linewidth=0.7, zorder=4, label=lbl)
 
     a4_ann = {
-        ("faiss_ivf", "np16"): ("np16", (42, 74), "left"),
-        ("faiss_ivf", "np24"): ("np24\n(1.1k QPS)", (6, 122), "left"),
-        ("diskann", "L64"): ("DiskANN\nL64 (5.4k)", (220, 122), "center"),
-        ("hnswlib", "ef96"): ("hnswlib ef96\n(7.1k QPS)", (215, 70), "center"),
-        ("hnswlib", "ef64"): ("ef64 (70.8%)", (36, 52), "left"),
-        ("usearch_rust", "ef96"): ("US-R\nef96", (336, 121), "center"),
-        ("usearch", "ef64"): ("ef64\n(71.7%)", (236, 30), "center"),
+        ("faiss_ivf", "np16"): ("np16", (14, 75), "center"),
+        ("faiss_ivf", "np24"): ("np24\n(1.1k)", (32, 128), "center"),
+        ("diskann", "L64"): ("DiskANN\nL64 (5.4k)", (186, 129), "center"),
+        ("hnswlib", "ef96"): ("hnswlib\nef96 (7.1k)", (216, 33), "center"),
+        ("hnswlib", "ef64"): ("ef64\n(70.8%)", (62, 50), "center"),
+        ("usearch_rust", "ef96"): ("US-R\nef96", (348, 128), "center"),
+        ("usearch", "ef64"): ("ef64\n(71.7%)", (356, 52), "center"),
     }
     for _, r in a4_plot.iterrows():
         k = (r["system"], r["param_tag"])
         if k in a4_ann:
             txt, xyt, ha_v = a4_ann[k]
             ax1.annotate(txt, xy=(r["total_cpu_ms"] / 1000.0, r["attainment_0965_pct"]), xytext=xyt,
-                         fontsize=7.5, ha=ha_v, va="center", color=PAL["ink"], bbox=PAD_BOX, zorder=6,
+                         fontsize=8.1, ha=ha_v, va="center", color=PAL["ink"], bbox=PAD_BOX, zorder=6,
                          arrowprops=dict(arrowstyle="-", color=PAL["gray_edge"], lw=0.55, shrinkA=0, shrinkB=4))
 
     ax1.axhline(95.0, color=PAL["rose_edge"], linestyle="--", linewidth=0.9, zorder=3)
-    ax1.text(105, 92.0, "95% Floor", fontsize=7.6, color=PAL["rose_edge"], fontweight="bold",
+    ax1.text(350, 90.0, "95% Floor", fontsize=8.1, color=PAL["rose_edge"], fontweight="bold",
              ha="center", va="top", bbox=PAD_BOX, zorder=6)
-    ax1.set_xlabel("Xeon Core-0 CPU (s)")
-    ax1.set_ylabel("Attainment % (@0.965)")
-    ax1.set_xlim(4, 366)
-    ax1.set_ylim(6, 136)
-    ax1.legend(loc="lower center", bbox_to_anchor=(0.50, 1.01), ncol=2, fontsize=7.5,
+    ax1.set_xlabel("Xeon Core-0 CPU (s)", fontsize=8.5)
+    ax1.set_ylabel("Attainment % (@0.965)", fontsize=8.5)
+    ax1.set_xlim(-24, 418)
+    ax1.set_ylim(2, 148)
+    ax1.legend(loc="lower center", bbox_to_anchor=(0.50, 1.01), ncol=2, fontsize=8.1,
                columnspacing=0.35, handlelength=0.80, labelspacing=0.12)
     panel_tag(ax1, "A", x=-0.22, y=1.24)
 
@@ -788,37 +818,38 @@ def make_fig7() -> Path:
                 ax2.annotate(
                     f"{rv:.1f}\u00d7 (31.2\u00d7)",
                     xy=(bx, cap_y),
-                    xytext=(3.2, 2.86),
-                    ha="center", va="bottom", fontsize=7.6, fontweight="bold", color=PAL["rose_edge"],
+                    xytext=(3.3, 2.86),
+                    ha="center", va="bottom", fontsize=8.1, fontweight="bold", color=PAL["rose_edge"],
                     arrowprops=dict(arrowstyle="->", color=PAL["rose_edge"], lw=0.75, shrinkA=0, shrinkB=2),
                 )
             elif col == "cpu_inflation_vs_iso" and reg == "ht_sibling_2w" and s_idx in (0, 2, 5):
                 ax2.text(b.get_x() + b.get_width() / 2.0, rv + 0.06, f"{rv:.2f}\u00d7",
-                         ha="center", va="bottom", fontsize=7.4, color=PAL["ink"], rotation=90)
+                         ha="center", va="bottom", fontsize=8.0, color=PAL["ink"], rotation=90)
 
     ax2.axhline(1.0, color=PAL["ref"], linestyle="--", linewidth=0.8)
     ax2.set_xticks(x2)
-    ax2.set_xticklabels(sys_lbls, fontsize=7.5, rotation=28, ha="right")
-    ax2.set_ylabel("Inflation vs. Iso-1w (\u00d7)")
-    ax2.set_ylim(0, 3.42)
-    ax2.legend(loc="lower center", bbox_to_anchor=(0.52, 1.01), ncol=2, fontsize=7.5,
+    ax2.set_xticklabels(sys_lbls, fontsize=8.1, rotation=45, ha="right", rotation_mode="anchor")
+    ax2.set_ylabel("Inflation vs. Iso-1w (\u00d7)", fontsize=8.5)
+    ax2.set_ylim(0, 3.48)
+    ax2.legend(loc="lower center", bbox_to_anchor=(0.52, 1.01), ncol=2, fontsize=8.1,
                columnspacing=0.35, handlelength=0.80, labelspacing=0.12)
     panel_tag(ax2, "B", x=-0.26, y=1.24)
 
+    s2_10m = pd.read_csv(RES / "exp9_rust_and_scale" / "s2_scale_1m_to_10m.csv")
     rows_c = []
     for wl_df, picks in [
         (d8_768, [("faiss_hnsw", "ef64", "768d F-HNSW"), ("hnswlib", "ef64", "768d hnswlib"), ("faiss_ivf", "np16", "768d IVF np16")]),
-        (d8_500[d8_500["workload"] == "arxiv500k_drift"], [("faiss_ivf", "np32", "500K IVF np32"), ("hnswlib", "ef64", "500K hnswlib"), ("diskann", "L64", "500K DiskANN")]),
         (d8_1m, [("faiss_ivf", "np32", "1M-A IVF np32"), ("hnswlib", "ef64", "1M-A hnswlib"), ("diskann", "L64", "1M-A DiskANN")]),
     ]:
         for sy, pt, lbl in picks:
             m = wl_df[(wl_df["system"] == sy) & (wl_df["param_tag"] == pt)].iloc[0]
             rows_c.append((lbl, float(m["query_cpu_pct"]), float(m["maint_cpu_pct"]), f"{float(m['rel_cpu_vs_faiss_base']):.2f}\u00d7 ({float(m['attainment_0965_pct']):.0f}%)"))
-    for tr_n, picks in [
-        ("bigann_1m_drift", [("faiss_ivf", "np32", "1M-X IVF np32"), ("hnswlib", "ef128", "1M-X hnswlib"), ("usearch_rust", "ef128", "1M-X US-R")]),
+    for df_src, tr_n, picks in [
+        (s1_1m, "bigann_1m_drift", [("faiss_ivf", "np32", "1M-X IVF np32"), ("hnswlib", "ef128", "1M-X hnswlib"), ("usearch_rust", "ef128", "1M-X US-R")]),
+        (s2_10m, "bigann_10m_drift", [("faiss_ivf", "np64", "10M IVF np64"), ("hnswlib", "ef96", "10M hnswlib"), ("usearch_rust", "ef96", "10M US-R")]),
     ]:
         for sy, pt, lbl in picks:
-            m = s1_1m[(s1_1m["trace"] == tr_n) & (s1_1m["engine"] == sy) & (s1_1m["config"] == pt)].iloc[0]
+            m = df_src[(df_src["trace"] == tr_n) & (df_src["engine"] == sy) & (df_src["config"] == pt)].iloc[0]
             rows_c.append((lbl, float(m["query_pct"]), float(m["maint_pct"]), f"{float(m['total_cpu_s']):.1f}s ({float(m['att_0965_pct']):.0f}%)"))
 
     yc = np.arange(len(rows_c))
@@ -827,16 +858,17 @@ def make_fig7() -> Path:
     ax3.barh(yc, q_pct, height=0.62, facecolor=PAL["peri_fill"], edgecolor=PAL["ink"], linewidth=0.58, label="Query %")
     ax3.barh(yc, m_pct, left=q_pct, height=0.62, facecolor=PAL["mint_fill"], edgecolor=PAL["ink"], linewidth=0.58, label="Maint %")
     for idx, (_, _, _, tag_str) in enumerate(rows_c):
-        ax3.text(103.0, idx, tag_str, va="center", ha="left", fontsize=7.5, color=PAL["ink"])
+        ax3.text(103.0, idx, tag_str, va="center", ha="left", fontsize=8.1, color=PAL["ink"])
     ax3.axhline(2.5, color=PAL["ref"], linestyle=":", linewidth=0.8)
     ax3.axhline(5.5, color=PAL["ref"], linestyle=":", linewidth=0.8)
     ax3.axhline(8.5, color=PAL["ref"], linestyle=":", linewidth=0.8)
     ax3.set_yticks(yc)
-    ax3.set_yticklabels([r[0] for r in rows_c], fontsize=7.5)
+    ax3.set_yticklabels([r[0] for r in rows_c], fontsize=8.1)
     ax3.set_xticks([0, 25, 50, 75, 100])
-    ax3.set_xlabel("CPU Split (%) [Cost/Rel., Att.]")
-    ax3.set_xlim(0, 198)
-    ax3.legend(loc="lower center", bbox_to_anchor=(0.48, 1.01), ncol=2, fontsize=7.5,
+    ax3.set_xticklabels(["0", "25", "50", "75", "100"], fontsize=8.1)
+    ax3.set_xlabel("CPU Split (%) [Cost/Rel., Att.]", fontsize=8.5)
+    ax3.set_xlim(0, 206)
+    ax3.legend(loc="lower center", bbox_to_anchor=(0.48, 1.01), ncol=2, fontsize=8.1,
                columnspacing=0.35, handlelength=0.80, labelspacing=0.12)
     panel_tag(ax3, "C", x=-0.36, y=1.24)
 

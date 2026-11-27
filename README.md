@@ -13,9 +13,9 @@ Official reproducibility artifact for the **PVLDB Volume 20 (VLDB 2027)** Experi
 ### Four Quantitative Measurement-Hygiene Gates (`hygiene/audit_hygiene.py`)
 
 1. **Gate 1 — Executed Cadence Bracket (`check_cadence_bracket`)**: Requires every budgeted policy spend $M(\pi)$ to be bracketed between two *executed* adjacent integer cadences ($M(c{+}1) \le M(\pi) \le M(c)$ for $c \in \{1..8\}$ or `noop`), preventing linear-interpolation illusions across non-linear cost frontiers.
-2. **Gate 2 — Split & Clock Leakage (`check_clock_leak`)**: Enforces two-part admission requiring held-out switch-schedule ($t_{\text{sw}}$) train/test splits alongside Spearman rank correlation filtering ($|\rho_{\text{Spearman}}(f, j)| < 0.85$), quarantining leaky predictors from causal comparisons.
-3. **Gate 3 — Counterfactual Attribution & Tombstone Semantics**: Evaluates counterfactual actions over full multi-window horizons ($H=4$ blocks) rather than truncated 1-block snapshots, and isolates tombstone-reclaiming `refresh` from append-compacting `merge` under deletions.
-4. **Gate 4 — Contention & Cross-NUMA Isolation (`check_contamination`)**: Enforces single-thread execution (`OMP_NUM_THREADS=1`), physical core pinning within one NUMA node, zero cross-batch pooling, and $\text{wall}/\text{CPU} \le 1.18$ with paired-bootstrap confidence intervals (`paired_bootstrap_ci`).
+2. **Gate 2 — Split & Clock Leakage (`check_clock_leak`)**: Requires train/test splits that randomize both hotspot shards and switch times ($t_{\text{sw}}$), alongside Spearman rank correlation filtering ($|\rho_{\text{Spearman}}(f, j)| < 0.70$; a threshold of 0.85 misses `leak_dcum_shard` on three semantic arXiv suites), quarantining leaky predictors from causal comparisons.
+3. **Gate 3 — Counterfactual Attribution & Tombstone Semantics**: Accumulates counterfactual utility to the end of the trace ($H=\infty$; 4-block horizons still flip 7.9% of action pairs) rather than truncated windows, and isolates tombstone-reclaiming `refresh` from append-compacting `merge` under deletions.
+4. **Gate 4 — Contention & Cross-NUMA Isolation (`check_contamination`)**: Enforces single-thread execution (`OMP_NUM_THREADS=1`), physical core pinning within one NUMA node, zero cross-batch pooling, $\text{wall}/\text{CPU} \le 1.18$, and a co-scheduled GEMV probe slowdown $\le 1.25\times$ (symmetric SMT pressure keeps wall/CPU near 1.00), with paired-bootstrap confidence intervals (`paired_bootstrap_ci`).
 
 ---
 

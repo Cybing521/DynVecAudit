@@ -57,10 +57,16 @@ def spearman_rho(xs: Sequence[float], ys: Sequence[float]) -> float:
 
 def check_contamination(
     jsonl_path: str | Path,
-    max_wall_cpu_ratio: float = 1.15,
+    max_wall_cpu_ratio: float = 1.18,
     max_load: Optional[float] = None,
+    max_probe_slowdown: Optional[float] = 1.25,
 ) -> Dict[str, Any]:
-    """Audit a JSONL run log for wall/CPU inflation, incomplete runs, or host load spikes."""
+    """Audit a JSONL run log for wall/CPU inflation, host load spikes, or silent SMT pressure.
+
+    Symmetric hyper-thread contention keeps wall/CPU near 1.00 (Exp 10-B4: <= 1.002 while CPU
+    inflates 1.52x-1.78x), so Gate 4 also checks the slowdown of a co-scheduled 17.6 ms GEMV
+    probe when the log records it (``probe_slowdown``; clean <= 1.05x, contended >= 1.46x).
+    """
     p = Path(jsonl_path)
     if not p.exists():
         return {"passed": False, "path": str(p), "reasons": ["missing_file"]}
@@ -120,6 +126,11 @@ def check_contamination(
     if max_load is not None and max_load_seen is not None and max_load_seen > max_load:
         reasons.append(f"max_load={max_load_seen:.2f}>{max_load}")
 
+    probes = [float(r["probe_slowdown"]) for r in win_rows + run_rows + meta_rows if r.get("probe_slowdown") is not None]
+    max_probe_seen = max(probes) if probes else None
+    if max_probe_slowdown is not None and max_probe_seen is not None and max_probe_seen > max_probe_slowdown:
+        reasons.append(f"probe_slowdown={max_probe_seen:.3f}>{max_probe_slowdown}")
+
     return {
         "passed": len(reasons) == 0,
         "path": str(p),
@@ -128,6 +139,7 @@ def check_contamination(
         "wall_s": round(wall_s, 3) if wall_s is not None else None,
         "wall_cpu_ratio": round(ratio, 4) if ratio is not None else None,
         "max_load_seen": round(max_load_seen, 3) if max_load_seen is not None else None,
+        "max_probe_slowdown": round(max_probe_seen, 3) if max_probe_seen is not None else None,
         "reasons": reasons,
     }
 
@@ -151,7 +163,7 @@ def _to_column_dict(features_df: Any) -> Dict[str, List[float]]:
 def check_clock_leak(
     features_df: Any,
     step_col: str,
-    threshold: float = 0.85,
+    threshold: float = 0.70,
     ignore_cols: Optional[Iterable[str]] = None,
 ) -> Dict[str, Any]:
     """Flag features whose |Spearman rho| against monotonic step_col meets threshold."""
@@ -262,7 +274,7 @@ def run_self_test() -> int:
         "cum_inserts": [1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000],
         "q_recent_ratio": [0.4, 0.2, 0.7, 0.3, 0.6, 0.1, 0.5, 0.2],
     }
-    leak_res = check_clock_leak(feats, step_col="j", threshold=0.85)
+    leak_res = check_clock_leak(feats, step_col="j", threshold=0.70)
     assert not leak_res["passed"], f"expected clock leak detection: {leak_res}"
     assert "cum_inserts" in leak_res["flagged_features"]
     assert "q_recent_ratio" not in leak_res["flagged_features"]
@@ -270,7 +282,7 @@ def run_self_test() -> int:
     clean_res = check_clock_leak(
         {"j": feats["j"], "q_recent_ratio": feats["q_recent_ratio"]},
         step_col="j",
-        threshold=0.85,
+        threshold=0.70,
     )
     assert clean_res["passed"], f"expected clean features to pass: {clean_res}"
 
@@ -298,10 +310,20 @@ def run_self_test() -> int:
             + "\n",
             encoding="utf-8",
         )
+        smt_p = Path(td) / "silent_smt.jsonl"
+        smt_p.write_text(
+            json.dumps({"type": "window", "window": 0, "query_cpu_ms": 950.0, "update_cpu_ms": 50.0, "maint_cpu_ms": 0.0})
+            + "\n"
+            + json.dumps({"type": "run", "wall_s": 1.001, "load_end": 1.0, "probe_slowdown": 1.74})
+            + "\n",
+            encoding="utf-8",
+        )
         c_ok = check_contamination(clean_p, max_wall_cpu_ratio=1.15, max_load=2.0)
         c_bad = check_contamination(dirty_p, max_wall_cpu_ratio=1.15, max_load=2.0)
+        c_smt = check_contamination(smt_p, max_wall_cpu_ratio=1.18, max_load=2.0)
         assert c_ok["passed"], f"expected clean run to pass: {c_ok}"
         assert not c_bad["passed"] and len(c_bad["reasons"]) == 2, f"expected 2 flags: {c_bad}"
+        assert not c_smt["passed"] and c_smt["reasons"][0].startswith("probe_slowdown"), f"expected probe flag: {c_smt}"
 
     # 4) paired_bootstrap_ci
     ci = paired_bootstrap_ci([-12.0, -15.0, -10.0, -14.0, -11.0], n_boot=2000, seed=42)
@@ -315,14 +337,15 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="DynVecAudit hygiene checker")
     ap.add_argument("--self-test", action="store_true", help="Run built-in unit tests")
     ap.add_argument("--audit-jsonl", type=str, help="Audit a single JSONL replay log")
-    ap.add_argument("--max-ratio", type=float, default=1.15)
+    ap.add_argument("--max-ratio", type=float, default=1.18)
     ap.add_argument("--max-load", type=float, default=None)
+    ap.add_argument("--max-probe", type=float, default=1.25)
     args = ap.parse_args()
 
     if args.self_test:
         return run_self_test()
     if args.audit_jsonl:
-        res = check_contamination(args.audit_jsonl, args.max_ratio, args.max_load)
+        res = check_contamination(args.audit_jsonl, args.max_ratio, args.max_load, args.max_probe)
         print(json.dumps(res, indent=2))
         return 0 if res["passed"] else 1
     ap.print_help()

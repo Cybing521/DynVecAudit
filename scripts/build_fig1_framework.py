@@ -163,7 +163,7 @@ def build() -> None:
     tsw_runs = [("Abrupt (", False, False), ("t", False, True), ("sw", True, False), (") & (u, Q) grid", False, False)]
     add_box(slide, 0.11, 0.46, 1.46, 0.65, [
         ("Synthetic Drift Suites", 8.3, True, False),
-        ("SIFT-128 (100K → 5M)", 7.8, False, False),
+        ("SIFT-128 (100K → 10M)", 7.8, False, False),
         (tsw_runs, 7.8, False, False),
     ], fill=GRAY_FILL)
     add_box(slide, 0.11, 1.19, 1.46, 0.65, [
@@ -197,12 +197,12 @@ def build() -> None:
 
     # Channel 3: FOUR HYGIENE GATES (x=3.77..5.85)
     add_channel(slide, 3.77, 0.06, 2.08, 2.60, "FOUR HYGIENE GATES", "Quantitative flip rejection")
-    g2_desc = [("Held-out ", False, False), ("t", False, True), ("sw", True, False), (" + |ρ| < 0.85 (93.5→78%)", False, False)]
+    g2_desc = [("Rand. hub + ", False, False), ("t", False, True), ("sw", True, False), (" + |ρ| < 0.70", False, False)]
     gates = [
         ("Gate 1: Cadence Bracket", "Executed c ∈ {1..8} (-10.6%..+18.3%)"),
         ("Gate 2: Split & Clock Leak", g2_desc),
-        ("Gate 3: Full-Horizon CF", "4-blk work (4.5×) & refresh (-17%)"),
-        ("Gate 4: NUMA Isolation", "Pin + w/C ≤ 1.18 (SMT + NUMA)"),
+        ("Gate 3: Full-Horizon CF", "Trace-end credit & refresh (-17%)"),
+        ("Gate 4: NUMA Isolation", "Pin + w/C ≤ 1.18 + probe ≤ 1.25×"),
     ]
     gate_mids = []
     gy = 0.46
@@ -218,10 +218,10 @@ def build() -> None:
     add_bus(slide, 3.53, 3.68, 3.83, [0.960, 2.065], gate_mids)
 
     # Channel 4: AUDITED OUTPUTS (x=6.03..7.15)
-    add_channel(slide, 6.03, 0.06, 1.12, 2.60, "OUTPUTS", "4,529-run audit")
+    add_channel(slide, 6.03, 0.06, 1.12, 2.60, "OUTPUTS", "4,855-run audit")
     add_box(slide, 6.09, 0.46, 1.00, 0.65, [
         ("Flip Matrix", 8.3, True, False),
-        ("80 Suites &", 7.8, False, False),
+        ("116 Suites &", 7.8, False, False),
         ("Clean Pareto", 7.8, False, False),
     ], fill=DARK_FILL)
     add_box(slide, 6.09, 1.19, 1.00, 0.65, [
@@ -231,7 +231,7 @@ def build() -> None:
     ], fill=DARK_FILL)
     add_box(slide, 6.09, 1.92, 1.00, 0.65, [
         ("5-Point Audit", 8.3, True, False),
-        ("Selection Guide", 7.8, False, False),
+        ("Engine Guidelines", 7.8, False, False),
         ("DynVecAudit", 7.8, False, True),
     ], fill=DARK_FILL)
 

@@ -280,13 +280,40 @@ def build_tab_trap4_combined() -> Dict[str, object]:
     df_tsw = pd.DataFrame(tsw_rows)
     df_tsw.to_csv(OUT_CSV / "tab_clean_abrupt_tsw.csv", index=False)
 
+    # Panel (b) since review round 2: symmetric contention (Exp 10-B4). All five policies per
+    # t_sw share the same contended core-0 regime (HT-sibling GEMV or oversubscribed 0,64),
+    # replacing the asymmetric cross-batch comparison as Trap 4 ranking evidence.
+    b4 = pd.read_csv(RES / "exp10_llm01" / "exp10b4_trap4_sym_dirty_roc.csv")
+    b4_arms = [
+        ("oracle", "Oracle (1-blk)"),
+        ("past_qmass", "Past-QMass"),
+        ("gbrt_causal", "GBRT-Causal"),
+        ("fixed_c2", "Fixed $c=2$"),
+        ("noop", "No-Op ($B=0$)"),
+    ]
+    b4_rows = []
+    for tsw in [16, 24, 28]:
+        for key, disp in b4_arms:
+            sel = b4[(b4["tsw"] == tsw) & (b4["policy"] == key)].set_index("regime")
+            dirty = sel.loc[["sym_dirty_ht_only", "sym_dirty_oversub"]]
+            b4_rows.append({
+                "tsw": tsw, "arm": key, "disp": disp,
+                "clean_cpu_s": float(sel.loc["clean_iso0", "cpu_s"]),
+                "ht_cpu_s": float(sel.loc["sym_dirty_ht_only", "cpu_s"]),
+                "ovs_cpu_s": float(sel.loc["sym_dirty_oversub", "cpu_s"]),
+                "dirty_wc_max": float(dirty["wall_cpu_ratio"].max()),
+                "dirty_probe_mean": float(dirty["probe_slowdown"].mean()),
+            })
+    df_b4 = pd.DataFrame(b4_rows)
+    df_b4.to_csv(OUT_CSV / "tab_trap4_symmetric_b4.csv", index=False)
+
     lines = [
-        "% Auto-generated from results/stage1_hygiene/ + results/abrupt_tsw{,_clean}/",
+        "% Auto-generated from results/stage1_hygiene/ + results/exp10_llm01/exp10b4_trap4_sym_dirty_roc.csv",
         "\\begin{table*}[t]",
         "\\centering",
         "\\small",
         "\\renewcommand{\\arraystretch}{0.92}",
-        "\\caption{Trap 4 measurement contamination and ranking reversals: (a) Dual Xeon 8352V symmetric placement contention ($n=186$, ratios vs.\\ Isolated NUMA-0 No-Op; under Same-Socket 8w, \\texttt{Past-QMass} inverts above \\texttt{No-Op} and \\texttt{c=2} in wall time and $p_{99}$); (b) asymmetric cross-batch load drift across $t_{\\text{sw}} \\in \\{16,24,28\\}$ ($n=96$), where \\texttt{GBRT-Causal}/Oracle ran in an idle batch ($1.00\\times$) while \\texttt{Past-QMass}/\\texttt{c=2}/\\texttt{No-Op} absorbed shared-host load ($1.14\\times$--$1.92\\times$), illustrating why Gate 4 forbids cross-batch pooling.}",
+        "\\caption{Trap 4 symmetric contention: (a) Dual Xeon 8352V placement regimes ($n=186$, ratios vs.\\ Isolated NUMA-0 No-Op; under Same-Socket 8w, \\texttt{Past-QMass} inverts above \\texttt{No-Op} and \\texttt{c=2} in wall time and $p_{99}$ but not in CPU); (b) Exp 10-B4 ($n=45$): for each $t_{\\text{sw}}$, all five policies run on the same core-0 regime, either idle (Clean), with a GEMV loop on its HT sibling (HT-sib.), or oversubscribed on both siblings (Oversub.). CPU inflates $1.52\\times$--$1.78\\times$ and the \\texttt{Past-QMass}/\\texttt{GBRT-Causal} order flips in 4 of 6 contended columns, while wall/CPU stays $\\le 1.002$; a co-scheduled $17.6$\\,ms GEMV probe slows $1.46\\times$--$1.91\\times$ (clean $\\le 1.05\\times$). Bold/underline rank non-oracle policies per column.}",
         "\\label{tab:trap4_contention}",
         "\\begin{minipage}[t]{0.49\\textwidth}",
         "\\centering",
@@ -313,25 +340,25 @@ def build_tab_trap4_combined() -> Dict[str, object]:
         "\\resizebox{\\linewidth}{!}{%",
         "\\begin{tabular}{llrrrrr}",
         "\\toprule",
-        "\\multicolumn{7}{c}{\\textbf{(b) Asymmetric Cross-Batch Load Drift ($t_{\\text{sw}}$, $n=96$)}} \\\\",
+        "\\multicolumn{7}{c}{\\textbf{(b) Same-Regime Contention, All Policies (Exp 10-B4, $n=45$)}} \\\\",
         "\\midrule",
-        "$t_{\\text{sw}}$ & Policy & Dirty (s) $\\downarrow$ & Clean (s) $\\downarrow$ & Infl. & $\\text{wall}/\\text{CPU}$ & Rec. \\\\",
+        "$t_{\\text{sw}}$ & Policy & Clean (s) $\\downarrow$ & HT-sib.\\ (s) $\\downarrow$ & Oversub.\\ (s) $\\downarrow$ & Max w/C & Probe \\\\",
         "\\midrule",
     ])
     for tsw in [16, 24, 28]:
-        sub = df_tsw[df_tsw["tsw"] == tsw].reset_index(drop=True)
-        elig_b = [r["arm"] != "forecast_oracle" for _, r in sub.iterrows()]
-        dfmt = _rank_format(sub["dirty_cpu_s"].tolist(), False, ".1f", eligible=elig_b)
-        cfmt = _rank_format(sub["clean_cpu_s"].tolist(), False, ".1f", eligible=elig_b)
+        sub = df_b4[df_b4["tsw"] == tsw].reset_index(drop=True)
+        elig_b = [r["arm"] != "oracle" for _, r in sub.iterrows()]
+        fmts = {c: _rank_format(sub[c].tolist(), False, ".1f", eligible=elig_b) for c in ("clean_cpu_s", "ht_cpu_s", "ovs_cpu_s")}
         for i, r in sub.iterrows():
-            prefix = "\\ccrow " if r["arm"] == "past_qmass_sp1" else ""
+            prefix = "\\ccrow " if r["arm"] == "past_qmass" else ""
             tsw_col = f"${tsw}$" if i == 0 else ""
-            is_ora = r["arm"] == "forecast_oracle"
+            is_ora = r["arm"] == "oracle"
+            cells = [fmts[c][i] for c in ("clean_cpu_s", "ht_cpu_s", "ovs_cpu_s")]
+            if is_ora:
+                cells = [f"\\textit{{{x}}}" for x in cells]
             pol_s = f"\\textit{{{r['disp']}}}" if is_ora else r["disp"]
-            d_s = f"\\textit{{{dfmt[i]}}}" if is_ora else dfmt[i]
-            c_s = f"\\textit{{{cfmt[i]}}}" if is_ora else cfmt[i]
             lines.append(
-                f"{prefix}{tsw_col} & {pol_s} & {d_s} & {c_s} & {r['inflation_x']:.2f}$\\times$ & {r['clean_wall_cpu']:.3f} & {r['clean_recall']:.4f} \\\\"
+                f"{prefix}{tsw_col} & {pol_s} & {cells[0]} & {cells[1]} & {cells[2]} & {r['dirty_wc_max']:.3f} & {r['dirty_probe_mean']:.2f}$\\times$ \\\\"
             )
         if tsw != 28:
             lines.append("\\midrule")
@@ -638,8 +665,8 @@ def build_tab_crossmodal_transfer() -> Dict[str, object]:
         ("gbrt_single_stream", "GBRT (Single-Stream)"),
         ("forecast_gbrt_causal", "GBRT (Causal)"),
         ("forecast_gbrt_causal_k5", "GBRT-Causal ($\\kappa=5$)"),
-        ("forecast_oracle", "Oracle"),
-        ("forecast_oracle_clairvoyant_k5", "Oracle ($\\kappa=5$)"),
+        ("forecast_oracle", "1-blk Oracle"),
+        ("forecast_oracle_clairvoyant_k5", "1-blk Oracle ($\\kappa=5$)"),
     ]
 
     specs = [
@@ -691,6 +718,29 @@ def build_tab_crossmodal_transfer() -> Dict[str, object]:
             "pq_cpu_s": pq_cpu,
             "pq_ops_m": pq_ops_m,
         })
+    # Add 1M -> 10M (100x scale, B=5, 36 traces, 252 runs) Rust replay + Prop. 1 MILP headroom
+    s2_hr_p = RES / "exp9_rust_and_scale" / "s2_headroom_100k_to_10m.csv"
+    if s2_hr_p.exists():
+        s2_hr = pd.read_csv(s2_hr_p)
+        for sc_tag, mult_lbl in [("1M", "10$\\times$"), ("2M", "20$\\times$"), ("5M", "50$\\times$"), ("10M", "100$\\times$")]:
+            sub_h = s2_hr[s2_hr["scale"] == sc_tag]
+            if sub_h.empty:
+                continue
+            gh = sub_h.groupby("policy")[["gcr_pct", "total_ops"]].mean()
+            ops_val = float(gh.loc["ewma_a03", "total_ops"])
+            trows.append({
+                "suite": f"BigANN-{sc_tag} ({mult_lbl}, $B{{=}}5$)",
+                "n_traces": int(sub_h["file"].nunique()),
+                "c2_gcr": float(gh.loc["fixed_c2", "gcr_pct"]),
+                "pq_gcr": float(gh.loc["ewma_a03", "gcr_pct"]),
+                "pq_lbl": "EWMA",
+                "alt_lbl": "Max-Delta",
+                "alt_gcr": float(gh.loc["max_delta", "gcr_pct"]),
+                "ora_gcr": float(gh.loc["oracle_1blk", "gcr_pct"]),
+                "pq_cpu_s": np.nan,
+                "pq_ops_m": ops_val / 1e6,
+            })
+
     exp8_milp = pd.read_csv(RES / "exp8_colab_large_scale" / "semantic_scale_milp_headroom.csv")
     for s_key, s_lbl, alt_pol, alt_lbl in [
         ("arxiv_140k_768d", "arXiv 768-d (140K, $B{=}5$)", "ewma_a07", "EWMA-0.7"),
@@ -718,7 +768,7 @@ def build_tab_crossmodal_transfer() -> Dict[str, object]:
         "\\centering",
         "\\small",
         "\\renewcommand{\\arraystretch}{0.88}",
-        "\\caption{Cross-modality predictability, real-timestamp streams (incl.\\ 140K \\texttt{arXiv-CS} 384-d/768-d and 1M \\texttt{arXiv-All}), and Proposition~1 Maintenance Headroom transfer across scale ($100\\text{K}\\rightarrow 1\\text{M}$), CPU architectures, Deletion Runbook, and seasonal horizons. GCR is normalized to Proposition~1 MILP ($100\\%$ headroom). On \\texttt{Wikimedia-210d}, raw shared-host CPU is withheld ($67/144$ Gate~4 flags; hardware-invariant GCR shown). \\texttt{Canon25 ($B{=}4$)} compares matched-$B{=}4$ policies (separate from $B{=}9$ above); bold/underline rank causal policies, with 1-block Oracle italicized.}",
+        "\\caption{Cross-modality predictability, real-timestamp streams (incl.\\ 140K \\texttt{arXiv-CS} 384-d/768-d and 1M \\texttt{arXiv-All}), and Proposition~1 Maintenance Headroom across scales ($100\\text{K}\\rightarrow 10\\text{M}$), CPU architectures, Deletion Runbook, and seasonal horizons. GCR is normalized to Proposition~1 MILP ($100\\%$ headroom). On \\texttt{Wikimedia-210d}, raw shared-host CPU is withheld ($67/144$ Gate~4 flags; hardware-invariant GCR shown). \\texttt{Canon25 ($B{=}4$)} and \\texttt{BigANN ($B{=}5$, $T{=}40$/10 blocks)} evaluate tighter matched budgets (under proportional $D$ scaling at fixed $R{=}16$, BigANN GCR is scale-invariant by homogeneity of Eq.~\\eqref{eq:scanops}, and co-located hotspot writes favor \\texttt{Max-Delta}); bold/underline rank causal policies, with 1-block Oracle italicized.}",
         "\\label{tab:crossmodal_transfer}",
         "\\begin{minipage}[t]{0.47\\textwidth}",
         "\\centering",
@@ -780,8 +830,13 @@ def build_tab_crossmodal_transfer() -> Dict[str, object]:
         pq_s = f"{fmtd[1]}\\%{pq_tag}"
         alt_s = f"{fmtd[2]}\\% ({r['alt_lbl']})"
         ora_s = f"\\textit{{{r['ora_gcr']:.1f}\\%}}" if not pd.isna(r["ora_gcr"]) else "--"
-        cost_s = f"{r['pq_cpu_s']:.1f}s" if not pd.isna(r["pq_cpu_s"]) else f"{r['pq_ops_m']:.1f}M ops"
-        prefix = "\\ccrow " if "Scale" in r["suite"] or "Cross-Arch" in r["suite"] else ""
+        if not pd.isna(r["pq_cpu_s"]):
+            cost_s = f"{r['pq_cpu_s']:.1f}s"
+        elif r["pq_ops_m"] >= 1000.0:
+            cost_s = f"{r['pq_ops_m']/1000.0:.2f}B ops"
+        else:
+            cost_s = f"{r['pq_ops_m']:.1f}M ops"
+        prefix = "\\ccrow " if "Scale" in r["suite"] or "BigANN-" in r["suite"] or "Cross-Arch" in r["suite"] else ""
         lines.append(
             f"{prefix}{r['suite']} & {int(r['n_traces'])} & {c2_s} & {pq_s} & {alt_s} & {ora_s} & {cost_s} \\\\"
         )
@@ -827,6 +882,10 @@ def build_tab_real_engines_1m_arxiv() -> Dict[str, object]:
     }
     a4_sum = pd.read_csv(RES / "exp6_real_engine_traps" / "a4_summary_by_config.csv")
     a3_raw = pd.read_csv(RES / "exp6_real_engine_traps" / "a3_crud_engines.csv")
+    # Review round 2 (N6): floor-calibrated FAISS-IVF np24/32/48 on 100K CRUD (Suite A3b, Xeon core 40, NUMA-1)
+    a3b_p = RES / "exp6_real_engine_traps" / "a3b_crud_ivf_floor.csv"
+    if a3b_p.exists():
+        a3_raw = pd.concat([a3_raw, pd.read_csv(a3b_p).drop(columns=["gate4_flag"], errors="ignore")], ignore_index=True)
     a1d_sum = pd.read_csv(RES / "exp6_real_engine_traps" / "a1d_summary.csv")
     a2_raw = pd.read_csv(RES / "exp6_real_engine_traps" / "a2_cadence_brackets.csv")
 
@@ -920,14 +979,14 @@ def build_tab_real_engines_1m_arxiv() -> Dict[str, object]:
         "\\centering",
         "\\small",
         "\\renewcommand{\\arraystretch}{0.86}",
-        "\\caption{Cross-engine audit across eight backends: (a) Dual Xeon 8352V Core-0 Gate-4 clean ($\\text{w/C}\\le 1.105$) recall floor, Rust \\texttt{usearch\\_rust}/\\texttt{hnsw\\_rs}, and bare-metal \\texttt{BigANN-1M}; (b) A100/T4 GPU-GT semantic Dimension $\\times$ Scale Crossover (140K 768-d, 120K AG News, 500K/1M 384-d; raw vCPU timings withheld). Below-floor configs ($^\\dagger$) are excluded from cost/latency/RSS ranking. $^*$VM Rel.\\ reports same-VM single-pinned ratios ($\\text{w/C}\\le 1.01$, subject to up to $\\sim 18\\%$ cross-engine SMT uncertainty); hardware-invariant Rec., Att., Q/M, and VmHWM are primary Gate-4-clean metrics.}",
+        "\\caption{Cross-engine audit across eight backends: (a) Dual Xeon 8352V Core-0 Gate-4 clean ($\\text{w/C}\\le 1.105$) recall floor, Rust \\texttt{usearch\\_rust}/\\texttt{hnsw\\_rs}, bare-metal \\texttt{BigANN-1M}, and NUMA-0 8t \\texttt{BigANN-5M/10M} scaling; (b) A100/T4 GPU-GT semantic Dimension $\\times$ Scale Crossover (140K 768-d, 120K AG News, 500K/1M 384-d; raw vCPU timings withheld). 100K CRUD \\texttt{FAISS-IVF (np24)} runs on isolated core 40 (NUMA-1, idle sibling, w/C $\\le 1.018$). Below-floor configs ($^\\dagger$) are excluded from cost/latency/RSS ranking. $^*$VM Rel.\\ reports same-VM single-pinned ratios ($\\text{w/C}\\le 1.01$, subject to up to $\\sim 18\\%$ cross-engine SMT uncertainty); hardware-invariant Rec., Att., Q/M, and VmHWM are primary Gate-4-clean metrics.}",
         "\\label{tab:real_engines_1m_arxiv}",
         "\\begin{minipage}[t]{0.49\\textwidth}",
         "\\centering",
         "\\resizebox{\\linewidth}{!}{%",
         "\\begin{tabular}{llrrrrr}",
         "\\toprule",
-        "\\multicolumn{7}{c}{\\textbf{(a) Xeon 8352V Core-0: Floor, Rust \\& Bare-Metal 1M}} \\\\",
+        "\\multicolumn{7}{c}{\\textbf{(a) Xeon 8352V: Core-0 Floor, Rust \\& 1M--10M BigANN}} \\\\",
         "\\midrule",
         "Workload & Engine (Cfg) & CPU (s) $\\downarrow$ & Rec. $\\uparrow$ & Att.@.965 $\\uparrow$ & $p_{99}$ ($\\mu$s) $\\downarrow$ & RSS $\\downarrow$ \\\\",
         "\\midrule",
@@ -948,23 +1007,23 @@ def build_tab_real_engines_1m_arxiv() -> Dict[str, object]:
         lines.append(f"{prefix}{wl_c} & {eng} & {c_f[i]} & {r_f[i]} & {a_f[i]}\\%{dag} & {p_f[i]} & {rss_f[i]} \\\\")
 
     a3_picks = {
-        "crud30v2": [("faiss_ivf", "np16"), ("diskann", "L64_cons1"), ("usearch_rust", "ef96"), ("hnswlib", "ef64"), ("hnsw_rs", "ef64")],
-        "crud50v2": [("faiss_ivf", "np16"), ("diskann", "L64_cons1"), ("usearch_rust", "ef96"), ("hnsw_rs", "ef64")],
-        "runbook": [("faiss_ivf", "np16"), ("diskann", "L64_cons0"), ("usearch_rust", "ef96"), ("hnswlib", "ef64")],
+        "crud30v2": [("faiss_ivf", "np16"), ("faiss_ivf", "np24"), ("diskann", "L64_cons1"), ("usearch_rust", "ef96")],
+        "crud50v2": [("faiss_ivf", "np16"), ("faiss_ivf", "np24"), ("diskann", "L64_cons1"), ("usearch_rust", "ef96")],
     }
-    a3_wl_disp = {"crud30v2": "100K CRUD30", "crud50v2": "100K CRUD50", "runbook": "Del. Runbook"}
-    for wl in ["crud30v2", "crud50v2", "runbook"]:
+    a3_wl_disp = {"crud30v2": "100K CRUD30", "crud50v2": "100K CRUD50"}
+    for wl in ["crud30v2", "crud50v2"]:
         lines.append("\\midrule")
         sub = a3_all[(a3_all["workload"] == wl) & a3_all.apply(lambda r: (r["system"], r["param_tag"]) in a3_picks[wl], axis=1)].copy()
         sub["ord"] = sub.apply(lambda r: a3_picks[wl].index((r["system"], r["param_tag"])), axis=1)
         sub = sub.sort_values("ord").reset_index(drop=True)
         ok_rows = [bool(r["status"] == "ok") for _, r in sub.iterrows()]
         elig_a3 = [bool(r["status"] == "ok" and r["attainment_0965_pct"] >= 95.0) for _, r in sub.iterrows()]
-        cf = _rank_format(sub["total_cpu_s"].tolist(), False, ".1f", eligible=elig_a3)
+        elig_a3_cost = elig_a3 if sum(elig_a3) >= 2 else [False] * len(elig_a3)
+        cf = _rank_format(sub["total_cpu_s"].tolist(), False, ".1f", eligible=elig_a3_cost)
         rf = _rank_format(sub["mean_recall"].tolist(), True, ".4f", eligible=ok_rows)
         af = _rank_format(sub["attainment_0965_pct"].tolist(), True, ".1f", eligible=ok_rows)
-        pf = _rank_format(sub["mean_p99_us"].tolist(), False, ".1f", eligible=elig_a3)
-        rssf_a3 = _rank_format(sub["peak_rss_mb"].tolist(), False, ".0f", eligible=elig_a3)
+        pf = _rank_format(sub["mean_p99_us"].tolist(), False, ".1f", eligible=elig_a3_cost)
+        rssf_a3 = _rank_format(sub["peak_rss_mb"].tolist(), False, ".0f", eligible=elig_a3_cost)
         for i, r in sub.iterrows():
             wl_c = a3_wl_disp[wl] if i == 0 else ""
             tag = r["param_tag"].replace("_", "\\_")
@@ -978,8 +1037,8 @@ def build_tab_real_engines_1m_arxiv() -> Dict[str, object]:
                 lines.append(f"{prefix}{wl_c} & {eng} & {cf[i]} & {rf[i]} & {af[i]}\\%{dag} & {pf[i]} & {rssf_a3[i]} \\\\")
 
     s1_picks = {
-        "bigann_1m_drift": [("faiss_ivf", "np32"), ("hnswlib", "ef128"), ("diskann", "L64"), ("usearch_rust", "ef128"), ("hnsw_rs", "ef128")],
-        "bigann_1m_crud20": [("faiss_ivf", "np32"), ("faiss_ivf", "np64"), ("usearch_rust", "ef128"), ("hnswlib", "ef128"), ("diskann", "L64_cons1")],
+        "bigann_1m_drift": [("faiss_ivf", "np32"), ("hnswlib", "ef128"), ("diskann", "L64"), ("usearch_rust", "ef128")],
+        "bigann_1m_crud20": [("faiss_ivf", "np64"), ("usearch_rust", "ef128"), ("hnswlib", "ef128"), ("diskann", "L64_cons1")],
     }
     s1_disp = {"bigann_1m_drift": "1M Drift", "bigann_1m_crud20": "1M CRUD20"}
     for wl in ["bigann_1m_drift", "bigann_1m_crud20"]:
@@ -1000,6 +1059,37 @@ def build_tab_real_engines_1m_arxiv() -> Dict[str, object]:
             ok = elig_s1[i]
             dag = "" if ok else "$^\\dagger$"
             prefix = "\\ccrow " if ok and r["engine"] in ("faiss_ivf", "usearch_rust") else ""
+            lines.append(f"{prefix}{wl_c} & {eng} & {cf[i]} & {rf[i]} & {af[i]}\\%{dag} & {pf[i]} & {rssf[i]} \\\\")
+
+    s2_raw = pd.read_csv(RES / "exp9_rust_and_scale" / "s2_scale_1m_to_10m.csv")
+    s2_raw.to_csv(OUT_CSV / "tab_s2_scale_1m_to_10m.csv", index=False)
+    s2_picks = {
+        "bigann_5m_drift": [("faiss_ivf", "np64"), ("hnswlib", "ef96"), ("usearch_rust", "ef96")],
+        "bigann_10m_drift": [("faiss_ivf", "np64"), ("hnswlib", "ef96"), ("usearch_rust", "ef96")],
+        "bigann_10m_crud20": [("faiss_ivf", "np64"), ("usearch_rust", "ef96")],
+    }
+    s2_disp = {"bigann_5m_drift": "5M Drift (8t)", "bigann_10m_drift": "10M Drift (8t)", "bigann_10m_crud20": "10M CRUD20"}
+    for wl in ["bigann_5m_drift", "bigann_10m_drift", "bigann_10m_crud20"]:
+        sub = s2_raw[(s2_raw["trace"] == wl) & s2_raw.apply(lambda r: (r["engine"], r["config"]) in s2_picks[wl], axis=1)].copy()
+        if sub.empty:
+            continue
+        lines.append("\\midrule")
+        sub["ord"] = sub.apply(lambda r: s2_picks[wl].index((r["engine"], r["config"])), axis=1)
+        sub = sub.sort_values("ord").reset_index(drop=True)
+        elig_s2 = [bool(r["att_0965_pct"] >= 95.0) for _, r in sub.iterrows()]
+        elig_s2_cost = elig_s2 if sum(elig_s2) >= 2 else [False] * len(elig_s2)
+        cf = _rank_format(sub["total_cpu_s"].tolist(), False, ".1f", eligible=elig_s2_cost)
+        rf = _rank_format(sub["mean_recall"].tolist(), True, ".4f")
+        af = _rank_format(sub["att_0965_pct"].tolist(), True, ".1f", eligible=elig_s2)
+        pf = _rank_format(sub["p99_us"].tolist(), False, ".0f", eligible=elig_s2_cost)
+        rssf = _rank_format(sub["peak_rss_mb"].tolist(), False, ".0f", eligible=elig_s2_cost)
+        for i, r in sub.iterrows():
+            wl_c = s2_disp[wl] if i == 0 else ""
+            tag = r["config"].replace("_", "\\_")
+            eng = f"{sys_disp[r['engine']]} ({tag})"
+            ok = elig_s2[i]
+            dag = "" if ok else "$^\\dagger$"
+            prefix = "\\ccrow " if ok and r["engine"] == "faiss_ivf" else ""
             lines.append(f"{prefix}{wl_c} & {eng} & {cf[i]} & {rf[i]} & {af[i]}\\%{dag} & {pf[i]} & {rssf[i]} \\\\")
 
     lines.extend([
@@ -1069,6 +1159,7 @@ def build_tab_real_engines_1m_arxiv() -> Dict[str, object]:
         "exp7_sift1m_rows": int(len(d1m)),
         "exp8_rows": int(len(d8_768) + len(d8_500) + len(d8_1m)),
         "exp9_r1_s1_rows": int(len(r1_a4_raw) + len(r1_a3_raw) + len(s1_raw)),
+        "exp9_s2_scale_rows": int(len(s2_raw)),
     }
 
 
@@ -1232,7 +1323,7 @@ def build_tab_m1_bridge() -> Dict[str, object]:
         "\\centering",
         "\\small",
         "\\renewcommand{\\arraystretch}{0.88}",
-        "\\caption{Real-engine scheduler bridge and methodology sensitivity audits: (a) 16-shard \\texttt{FAISS-IVF} and \\texttt{hnswlib} executing live policies on Core-8 (0 Gate~4 flags, $\\text{w/C}\\le 1.007$); (b) Held-out switch-schedule Trap~2 audit ($t_{\\text{sw}}\\in\\{16,20,24,28\\}$, $n=11$ traces) and compaction-cost-aware Proposition~1 sensitivity ($\\lambda\\in[0, 2\\lambda_0]$, $n=25$ traces). Bold/underline rank valid causal policies.}",
+        "\\caption{Real-engine scheduler bridge, methodology sensitivity, and $Q/u$ crossover audits: (a) 16-shard \\texttt{FAISS-IVF} and \\texttt{hnswlib} executing live policies on Core-8 (0 Gate~4 flags, $\\text{w/C}\\le 1.007$); (b) Held-out / $2{\\times}2$ randomized-$t_{\\text{sw}}$ Trap~2 audits ($n=11$ and $n=30$ traces), cost-aware Proposition~1 sensitivity ($\\lambda\\in[0, 2\\lambda_0]$), and Core-8 real-engine $Q/u$ crossover ($n=30$ runs). Bold/underline rank valid causal policies.}",
         "\\label{tab:m1_bridge}",
         "\\begin{minipage}[t]{0.53\\textwidth}",
         "\\centering",
@@ -1272,7 +1363,7 @@ def build_tab_m1_bridge() -> Dict[str, object]:
         "\\resizebox{\\linewidth}{!}{%",
         "\\begin{tabular}{llrrr}",
         "\\toprule",
-        "\\multicolumn{5}{c}{\\textbf{(b) Held-Out Schedule (Trap~2) \\& Cost-Aware Prop.~1}} \\\\",
+        "\\multicolumn{5}{c}{\\textbf{(b) Split De-Leakage, Cost-Aware Prop.~1 \\& $Q/u$ Crossover}} \\\\",
         "\\midrule",
         "Audit / Setting & Policy / Metric & Ops/Cost & GCR $\\uparrow$ & Sw.-Top1 / $\\tau$ \\\\",
         "\\midrule",
@@ -1295,6 +1386,16 @@ def build_tab_m1_bridge() -> Dict[str, object]:
         else:
             pl_s, g_s = pl, gcr_s
         lines.append(f"{prefix}{sp} & {pl_s} & {ops_b} & {g_s} & {t1} \\\\")
+    d1b_p = RES / "exp10_xww" / "exp10d1b_decoupled_summary.json"
+    if d1b_p.exists():
+        d1b = json.loads(d1b_p.read_text(encoding="utf-8"))
+        m_both = {r["policy"]: r for r in d1b["means"] if r["cohort"] == "rand_hub_and_rand_tsw_n30"}
+        if "gbrt_leaky" in m_both and "gbrt_causal" in m_both:
+            rl, rc = m_both["gbrt_leaky"], m_both["gbrt_causal"]
+            lines.append(
+                f"\\ccrow RandHub+Rand-$t_{{\\text{{sw}}}}$ ($n{{=}}30$) & Leaky / Causal & {rc['exact_scan_ops']/1e9:.2f}B & "
+                f"{rl['gcr_pct']:.2f} / \\textbf{{{rc['gcr_pct']:.2f}}}\\% & $\\Delta{{+}}0.01\\text{{ pp}}$ \\\\"
+            )
     lines.append("\\midrule")
     b1_agg = {(r["lambda_mult"], r["policy"]): r for r in mh_json["b1_milp_sensitivity"]["agg"]}
     taus = mh_json["b1_milp_sensitivity"]["taus_vs_lam0"]
@@ -1306,6 +1407,31 @@ def build_tab_m1_bridge() -> Dict[str, object]:
         lines.append(
             f"{lbl} & PQ vs.\\ $c=2$ & {pq_r['total_equiv_ops']/1e9:.2f}B & {pq_r['gcr_pct']:.1f} / {c2_r['gcr_pct']:.1f}\\% & {tau_s} \\\\"
         )
+    m3_p = RES / "exp9_mimo_supplement" / "m3_qu_crossover_real_engines.csv"
+    m3_stats: Dict[str, Any] = {}
+    if m3_p.exists():
+        m3_df = pd.read_csv(m3_p)
+        if len(m3_df) == 30:
+            m3_df.to_csv(OUT_CSV / "tab_m3_qu_crossover.csv", index=False)
+            c_025 = m3_df[(m3_df["u_pct"] == 10) & (m3_df["q_per_win"] == 2500)].set_index("system")
+            c_100 = m3_df[(m3_df["u_pct"] == 2) & (m3_df["q_per_win"] == 20000)].set_index("system")
+            lines.append("\\midrule")
+            lines.append(
+                f"M3 $Q/u{{=}}0.25$ ($10\\%, 2.5\\text{{k}}$) & IVF vs.\\ hnswlib & "
+                f"\\textbf{{{c_025.loc['faiss_ivf','total_cpu_s']:.1f}}} / {c_025.loc['hnswlib','total_cpu_s']:.1f}s & "
+                f"100 / 100\\% & IVF $2.73\\times$ \\\\"
+            )
+            lines.append(
+                f"\\ccrow M3 $Q/u{{=}}10.0$ ($2\\%, 20\\text{{k}}$) & IVF vs.\\ hnswlib & "
+                f"{c_100.loc['faiss_ivf','total_cpu_s']:.1f} / \\textbf{{{c_100.loc['hnswlib','total_cpu_s']:.1f}}}s & "
+                f"100 / 100\\% & HNSW $1.23\\times$ \\\\"
+            )
+            m3_stats = {
+                "n_runs": int(len(m3_df)),
+                "max_wall_cpu": round(float(m3_df["wall_cpu_ratio"].max()), 4),
+                "gate4_pass": f"{int((m3_df['wall_cpu_ratio'] <= 1.18).sum())}/{len(m3_df)}",
+                "crossover_qu_est": 4.4,
+            }
     lines.extend([
         "\\bottomrule",
         "\\end{tabular}}",
@@ -1313,8 +1439,32 @@ def build_tab_m1_bridge() -> Dict[str, object]:
         "\\end{table*}",
     ])
     (OUT_TEX / "tab_m1_bridge.tex").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    m2_stats: Dict[str, Any] = {}
+    m2_p = RES / "exp9_mimo_supplement" / "m2_quantized_backends.csv"
+    if m2_p.exists():
+        m2_df = pd.read_csv(m2_p)
+        if len(m2_df) == 39:
+            m2_agg = m2_df.groupby(["workload", "system", "quantization", "param_tag", "status"], as_index=False).agg(
+                n_runs=("total_cpu_s", "count"),
+                total_cpu_s=("total_cpu_s", "mean"),
+                mean_recall=("mean_recall", "mean"),
+                att_0965_pct=("att_0965_pct", "mean"),
+                p99_us=("p99_us", "mean"),
+                peak_rss_mb=("peak_rss_mb", "mean"),
+                max_wc=("wall_cpu_ratio", "max"),
+            )
+            m2_agg.to_csv(OUT_CSV / "tab_m2_quantized_backends.csv", index=False)
+            m2_stats = {
+                "n_runs": int(len(m2_df)),
+                "max_wall_cpu": round(float(m2_df["wall_cpu_ratio"].max()), 4),
+                "gate4_pass": f"{int((m2_df['wall_cpu_ratio'] <= 1.18).sum())}/{len(m2_df)}",
+            }
+
     return {
         "m1_bridge": m1_stats,
+        "m2_quantized": m2_stats,
+        "m3_qu_crossover": m3_stats,
         "heldout_schedule": ho_json["summary"],
         "b1_taus": taus,
         "b2_horizon": mh_json["b2_horizon_pooled"],
@@ -1329,16 +1479,25 @@ def write_verified_macros(ledger: Dict[str, Any]) -> None:
     ho = {(r["split_protocol"], r["policy"]): r for r in ledger["audits"]["heldout_schedule"]}
     t2 = ledger["trap2_leakage_2x2"]
 
-    # Verified total runs: 4,466 prior + M1 bridge runs + 11 heldout traces (no new runtime runs; deterministic replay on existing traces)
+    # Verified total runs: 4,466 prior + 5 new S2 10M rows + 252 S2 1M-10M Headroom rows + 63 M1 + 39 M2 + 30 M3
     m1_total_runs = sum(v["n_runs"] for v in m1.values())
-    total_runs = 4466 + m1_total_runs
+    m2_total_runs = int(ledger["audits"].get("m2_quantized", {}).get("n_runs", 0))
+    m3_total_runs = int(ledger["audits"].get("m3_qu_crossover", {}).get("n_runs", 0))
+    s2_extra_10m_runs = max(0, int(ledger["exp6_exp7"].get("exp9_s2_scale_rows", 21)) - 21)
+    s2_hr_p = RES / "exp9_rust_and_scale" / "s2_headroom_100k_to_10m.csv"
+    s2_hr_runs = int(len(pd.read_csv(s2_hr_p))) if s2_hr_p.exists() else 0
+    total_runs = 4466 + s2_extra_10m_runs + s2_hr_runs + m1_total_runs + m2_total_runs + m3_total_runs
+
+    flip_json_p = OUT_CSV / "ranking_flip_matrix.json"
+    flip_suites = int(json.loads(flip_json_p.read_text(encoding="utf-8"))["n_rows"]) if flip_json_p.exists() else 80
 
     macros = [
         "% Auto-generated by experiments/build_paper_tables.py — DO NOT HAND-EDIT",
         f"\\newcommand{{\\TotalRuns}}{{{total_runs:,}}}",
         f"\\newcommand{{\\PriorRuns}}{{4,466}}",
         f"\\newcommand{{\\MOneRuns}}{{{m1_total_runs}}}",
-        "\\newcommand{\\TotalTraces}{350}",
+        f"\\newcommand{{\\FlipSuites}}{{{flip_suites}}}",
+        "\\newcommand{\\TotalTraces}{396}",
         "\\newcommand{\\NumCodebases}{7}",
         "\\newcommand{\\NumBackends}{8}",
         f"\\newcommand{{\\HeadroomCtwoMin}}{{{hr['c2_gcr_min_pct']:.1f}}}",
