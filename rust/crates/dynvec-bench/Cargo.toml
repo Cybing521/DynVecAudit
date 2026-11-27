@@ -1,0 +1,16 @@
+[package]
+name = "dynvec-bench"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anndists = "0.1"
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+dynvec-core = { path = "../dynvec-core" }
+hnsw_rs = "0.3"
+rayon = "1.10"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+usearch = "2"

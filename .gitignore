@@ -4,6 +4,7 @@ __pycache__/
 *.so
 build/
 dist/
+target/
 .venv/
 *.log
 *.jsonl

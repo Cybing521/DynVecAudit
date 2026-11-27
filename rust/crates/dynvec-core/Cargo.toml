@@ -1,0 +1,11 @@
+[package]
+name = "dynvec-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow = "1"
+libc = "0.2"
+memmap2 = "0.9"
+serde = { version = "1", features = ["derive"] }
