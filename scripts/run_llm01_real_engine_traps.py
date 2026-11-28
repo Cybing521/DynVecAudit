@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Real-Engine Measurement Hygiene Traps & Multi-Thread/NUMA Benchmark on Dual Xeon 8352V.
+"""Real-Engine Measurement Hygiene Traps & Multi-Thread/NUMA Benchmark on Xeon-8352V.
 
 Implements 4 real-engine hygiene experiments across 5 open-source vector engines
 (FAISS-IVF, hnswlib, USearch, FreshDiskANN via diskannpy, Annoy) on SIFT-100K
@@ -56,10 +56,10 @@ import audit_hygiene as ah  # noqa: E402
 EV_INSERT, EV_UPDATE, EV_ERASE, EV_QUERY = 0, 1, 2, 3
 
 DATA_ROOTS_LLM01 = {
-    "drift": Path("data/sift100k_u10_q2500_v2"),
-    "crud30v2": Path("data/sift100k_u10_q2500_crud30v2"),
-    "crud50v2": Path("data/sift100k_u10_q2500_crud50v2"),
-    "runbook": Path("data/sift100k_u10_q2500_runbook"),
+    "drift": Path(os.environ.get("DYNVECAUDIT_DATA_ROOT", "./data")) / "sift100k_u10_q2500_v2",
+    "crud30v2": Path(os.environ.get("DYNVECAUDIT_DATA_ROOT", "./data")) / "sift100k_u10_q2500_crud30v2",
+    "crud50v2": Path(os.environ.get("DYNVECAUDIT_DATA_ROOT", "./data")) / "sift100k_u10_q2500_crud50v2",
+    "runbook": Path(os.environ.get("DYNVECAUDIT_DATA_ROOT", "./data")) / "sift100k_u10_q2500_runbook",
 }
 
 
@@ -1301,9 +1301,9 @@ def run_a4(out_dir: Path, cache_dir: Path, max_load: float, max_windows: Optiona
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="PVLDB Real-Engine Hygiene Traps (Dual Xeon 8352V)")
+    ap = argparse.ArgumentParser(description="PVLDB Real-Engine Hygiene Traps on Xeon-8352V")
     ap.add_argument("--suite", default="ALL", choices=["ALL", "A1D", "A2", "A3", "A4"])
-    ap.add_argument("--out-dir", default="results/exp6_real_engine_traps")
+    ap.add_argument("--out-dir", default=os.environ.get("DYNVECAUDIT_RESULTS_DIR", "./results"))
     ap.add_argument("--max-load", type=float, default=25.0)
     ap.add_argument("--max-windows", type=int, default=0)
     ap.add_argument("--a1d-windows", type=int, default=10)

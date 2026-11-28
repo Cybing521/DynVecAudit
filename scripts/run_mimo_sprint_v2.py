@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""PVLDB Sprint v2 Offload Runner for Ryzen 9 9950X (16 physical cores).
+"""PVLDB Sprint v2 Offload Runner for `Ryzen-9950X` (Ryzen 9 9950X, 16 physical cores).
 
 Executes the 4 self-contained suites (`p0_2`, `p1_1b`, `p1_1c`, `p1_2`) on spaced physical
-cores (`0..15`, zero HT siblings `16..31`) via `qbam_replay`
+cores (`0..15`, zero HT siblings `16..31`) via `./replay/build/qbam_replay`
 pinned with `taskset -c <core>` and single-thread BLAS env vars.
 
-Zero cross-host batch pooling: each suite is self-contained on a single host and records
+Zero cross-host batch pooling: each suite is self-contained on `Ryzen-9950X` and records
 `wall_ms` and `wall_cpu_ratio` for every run.
 """
 from __future__ import annotations
@@ -34,12 +34,12 @@ from scipy.optimize import Bounds, LinearConstraint, milp
 from scipy.sparse import lil_matrix
 from sklearn.ensemble import HistGradientBoostingRegressor
 
-REPLAY_BIN = Path("/workspace/qbam/build_rev4/qbam_replay")
-QBAM_DATA = Path("/workspace/qbam/data")
-WORKLOAD_DIR = Path("/workspace/qbam/python/workloads")
-WORKLOAD_YAML = Path("/workspace/qbam/configs/workload_shift.yaml")
-SPRINT_DATA = Path("/workspace/pvldb/data_sprint_v2")
-SPRINT_RES = Path("/workspace/pvldb/results/sprint_v2")
+REPLAY_BIN = Path(os.environ.get("DYNVECAUDIT_REPLAY_BIN", "./replay/build/qbam_replay"))
+QBAM_DATA = Path(os.environ.get("DYNVECAUDIT_DATA_ROOT", "./data"))
+WORKLOAD_DIR = Path(os.environ.get("DYNVECAUDIT_WORKLOAD_DIR", "./configs/workloads"))
+WORKLOAD_YAML = Path(os.environ.get("DYNVECAUDIT_WORKLOAD_YAML", "./configs/workload_shift.yaml"))
+SPRINT_DATA = Path(os.environ.get("DYNVECAUDIT_SPRINT_DATA", "./data/sprint_v2"))
+SPRINT_RES = Path(os.environ.get("DYNVECAUDIT_RESULTS_DIR", "./results/sprint_v2"))
 
 K_BLOCK = 4
 BUILD_W = 12

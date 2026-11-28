@@ -30,7 +30,7 @@ from scipy.optimize import Bounds, LinearConstraint, milp
 from scipy.sparse import lil_matrix
 from scipy.stats import kendalltau
 
-for cand in ("/root/qbamdeploy/qbam/external/tools", "/workspace/qbam/external/tools"):
+for cand in (os.environ.get("DYNVECAUDIT_TOOLS_DIR", "./tools"), os.environ.get("DYNVECAUDIT_TOOLS_DIR", "./tools")):
     if Path(cand).exists():
         sys.path.insert(0, cand)
         break

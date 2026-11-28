@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Exp 2 & Exp 3 Orchestrator for PVLDB EA&B (DynVecAudit).
 
-Runs Phase 1 (SIFT-128 on Ryzen 9 9950X) or Phase 2 (MiniLM-384 / CLIP-512 on EPYC 7343):
+Runs on Ryzen-9950X (Phase 1 SIFT-128) or EPYC-7343 (Phase 2 MiniLM-384 / CLIP-512):
   - Suite `sift25`   : 25 traces (5 drifts x 5 seeds) x {noop, past_qmass, bam_price,
                       8 forecast_qmass predictors, 8 executed fixed cadences c=1..8}
   - Suite `phaselock`: t_sw in {16,20,24,28} x 5 seeds x {noop, spacing=1/2/3, fixed c=1..4}
@@ -54,7 +54,7 @@ DEFAULT_K = 4
 
 
 # ---------------------------------------------------------------------------
-# Binary readers matching QBAM frozen contract (self-contained, stdlib/numpy only)
+# Binary readers matching QBAM frozen contract (self-contained, no external import)
 # ---------------------------------------------------------------------------
 def _read_header(path: Path, magic: bytes, fmt: str) -> Tuple[Tuple[int, ...], int]:
     with path.open("rb") as f:
@@ -716,10 +716,10 @@ def execute_tasks(args: argparse.Namespace, tasks: List[Dict[str, Any]]) -> Dict
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="PVLDB Exp 2 & Exp 3 Predictors + Cadence Orchestrator")
-    ap.add_argument("--data-root", default="/workspace/qbam/data/sift100k_u10_q2500_v2")
+    ap.add_argument("--data-root", default=os.environ.get("DYNVECAUDIT_DATA_ROOT", "./data/sift100k_u10_q2500_v2"))
     ap.add_argument("--phaselock-root", default="")
-    ap.add_argument("--binary", default="/workspace/qbam/build_rev4/qbam_replay")
-    ap.add_argument("--out-dir", default="/workspace/pvldb/results/exp2_predictors_cadence")
+    ap.add_argument("--binary", default=os.environ.get("DYNVECAUDIT_REPLAY_BIN", "./replay/build/qbam_replay"))
+    ap.add_argument("--out-dir", default=os.environ.get("DYNVECAUDIT_OUT_DIR", "./results/exp2_predictors_cadence"))
     ap.add_argument("--core", type=int, default=8)
     ap.add_argument("--suite", choices=["sift25", "phaselock", "refresh", "all"], default="sift25")
     ap.add_argument("--kappas", default="5.0", help="Comma-separated budget tiers, e.g. 2.0,3.0,5.0")

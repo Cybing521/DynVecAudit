@@ -36,7 +36,7 @@ def _exp2_running() -> bool:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="Probe Peak RSS for Exp 5A Python-harness engines")
-    ap.add_argument("--work-dir", default="/workspace/pvldb")
+    ap.add_argument("--work-dir", default=os.environ.get("DYNVECAUDIT_ROOT", "."))
     ap.add_argument("--core", type=int, default=8)
     ap.add_argument("--max-load", type=float, default=1.5)
     ap.add_argument("--no-wait-exp2", action="store_true")

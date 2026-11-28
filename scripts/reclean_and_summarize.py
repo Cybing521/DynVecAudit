@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Post-Completion Hygiene Cleaner & Statistical Re-Aggregator for DynVecAudit / Paper 2A.
 
-Scans DynVecAudit results tree (excluding stage1_hygiene where contention is intentional),
+Scans benchmark results tree (excluding stage1_hygiene where contention is intentional),
 audits:
   1. Missing WALL_MS= in .log (--require-wall)
   2. WALL_MS / total_cpu_ms > max_ratio
-  3. Bad pin_cpu in --exclude-pins (e.g. colliding cores on a shared host)
+  3. Bad pin_cpu in --exclude-pins (e.g. colliding cores like 22 or 27 on EPYC-7343)
   4. Trace-level w0 invariant-window canary (w0_query_cpu_ms / min_w0 > max_w0_ratio)
 
 Optionally re-executes ONLY contaminated `.config.json` files cleanly on isolated CPU core(s)

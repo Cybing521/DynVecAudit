@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Audit A: Shared-Schedule vs. Held-Out Schedule Split-Leakage Verification (Trap 2 / W5).
 
-Runs on llm_01 (Socket-1 isolated core) using exact (Q, D) matrices from abrupt-switch
+Runs on Xeon-8352V (Socket-1 isolated core) using exact (Q, D) matrices from abrupt-switch
 traces across four distinct switch timings t_sw in {16, 20, 24, 28}:
   - tsw16/sift100k_u10_q2500_v2/traces/abrupt_s05, abrupt_s06 (t_sw=16)
   - sift100k_u10_q2500_v2/traces/abrupt_s05..s09 (t_sw=20)
@@ -33,7 +33,7 @@ import numpy as np
 from scipy.optimize import Bounds, LinearConstraint, milp
 from scipy.sparse import lil_matrix
 
-for cand in ("/root/qbamdeploy/qbam/external/tools", "/workspace/qbam/external/tools"):
+for cand in (os.environ.get("DYNVECAUDIT_TOOLS_DIR", "./tools"), os.environ.get("DYNVECAUDIT_TOOLS_DIR", "./tools")):
     if Path(cand).exists():
         sys.path.insert(0, cand)
         break

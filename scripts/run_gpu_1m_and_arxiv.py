@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""GPU Real-Timestamp arXiv CS Stream (B3) & 1M Multi-Engine Audit (B1) on Cloud GPU.
+"""GPU Real-Timestamp arXiv CS Stream (B3) & 1M Multi-Engine Audit (B1) on Google Colab.
 
-Runs on a cloud GPU node (L4/A100) using:
+Runs on Google Colab L4/A100 (`pvldb-l4`) using:
   - System CUDA Python for GPU MiniLM-384 encoding (`all-MiniLM-L6-v2`) and
     exact PyTorch FP32 GEMM Top-10 Ground Truth generation.
-  - Python 3.11 venv for isolated single-core
+  - Python 3.11 venv (`/content/venv311/bin/python`) for isolated single-core
     (`taskset -c 0`, `OMP_NUM_THREADS=1`) execution across ALL 5 engines:
     FAISS-IVF, hnswlib, USearch, FreshDiskANN (`diskannpy==0.7.0`), and Annoy.
 
 Strict Gate-4 / Hygiene Guard:
-  Cloud vCPU wall/CPU timings are NEVER exported for Gate-4 CPU timing tables.
+  Colab vCPU wall/CPU timings are NEVER exported for Gate-4 CPU timing tables.
   Summary CSVs report strictly:
     - GPU-verified Recall@10 (mean, min, >=0.965 & >=0.950 attainment %)
     - Isolated per-engine Peak RSS (MB)
@@ -128,7 +128,7 @@ def discover_environment(out_dir: Path, worker_py: str) -> Dict[str, Any]:
         "ram_gb": mem_gb,
         "gpu": torch.cuda.get_device_name(0) if torch.cuda.is_available() else "none",
         "engines": engines,
-        "gate4_note": "Cloud vCPU timings withheld from Gate-4 CPU tables; only ratios, Peak RSS, GPU recall, and hardware-invariant ops reported.",
+        "gate4_note": "Colab vCPU timings withheld from Gate-4 CPU tables; only ratios, Peak RSS, GPU recall, and hardware-invariant ops reported.",
     }
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "exp7_env_metadata.json").write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
@@ -821,7 +821,7 @@ def _invoke_worker_subproc(
 
 
 def _finalize_engine_rows(raw_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Replace internal CPU ms with baseline-relative ratio; never export cloud raw CPU ms."""
+    """Replace internal CPU ms with baseline-relative ratio; never export Colab raw CPU ms."""
     base_cpu = None
     for r in raw_rows:
         if r.get("status") == "ok" and r["system"] == "faiss_ivf" and r["param_tag"] == "np16":

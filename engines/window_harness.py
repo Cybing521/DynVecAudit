@@ -32,7 +32,7 @@ from perf_counter/steady_clock around each individual call.
 
 Usage
   python3 qbam/external/harness/window_harness.py --system quake --trace uniform_s00 \
-      --data-root /workspace/qbam/data/sift100k_u10 --out results/harness/quake_uniform_s00.jsonl
+      --data-root data/sift100k_u10 --out results/harness/quake_uniform_s00.jsonl
   python3 qbam/external/harness/window_harness.py --system diskann --trace hotspot_s00 ...
 """
 from __future__ import annotations

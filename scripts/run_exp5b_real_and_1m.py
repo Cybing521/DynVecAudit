@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Exp 5B: 6-Engine Open-Source Evaluation on Real-Timestamp Wikimedia & 1M Scale.
 
-Uses the non-invasive overlay harness on an idle host (Core 8 pinned, nice -n 19, load-gated <= 2.2, 2400s per-run timeout).
+Reuses the non-invasive overlay harness at `engines/window_harness.py`
+on idle `Ryzen-9950X` (Core 8 pinned, nice -n 19, load-gated <= 2.2, 2400s per-run timeout).
 
 Suites:
   1. wikimedia_w2real : `sift100k_u10_q2500_w2real` (`real_s00`) x 6 engines (10 configs)
@@ -23,9 +24,9 @@ from typing import Any, Dict, List
 THIS_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(THIS_DIR))
 
-EXT_SRC = Path("/workspace/qbam/external")
+EXT_SRC = Path(os.environ.get("DYNVECAUDIT_ENGINES_DIR", str(Path(__file__).resolve().parents[1] / "engines")))
 VENV_PY = EXT_SRC / "venv" / "bin" / "python"
-DATA_BASE = Path("/workspace/qbam/data")
+DATA_BASE = Path(os.environ.get("DYNVECAUDIT_DATA_ROOT", "./data"))
 
 
 def log(msg: str) -> None:
@@ -196,7 +197,7 @@ def write_summary(summary_rows: List[Dict[str, Any]], csv_path: Path) -> None:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="PVLDB Exp 5B Real-Timestamp & 1M 6-Engine Benchmark")
-    ap.add_argument("--work-dir", default="/workspace/pvldb")
+    ap.add_argument("--work-dir", default=os.environ.get("DYNVECAUDIT_ROOT", "."))
     ap.add_argument("--core", type=int, default=8)
     ap.add_argument("--max-load", type=float, default=2.2)
     ap.add_argument("--timeout-s", type=int, default=2400)

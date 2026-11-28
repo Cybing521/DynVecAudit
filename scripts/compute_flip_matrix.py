@@ -995,15 +995,19 @@ def ingest_colab_1m_audit(res_dir: Path) -> Tuple[List[Dict[str, Any]], List[str
     return rows, []
 
 
-def ingest_exp8_rust_and_10m_scale(res_dir: Path) -> Tuple[List[Dict[str, Any]], List[str]]:
-    exp8_dir = res_dir / "exp8_rust_and_10m_scale"
-    if not exp8_dir.exists():
-        return [], ["results/exp8_rust_and_10m_scale/"]
+def ingest_exp9_rust_scale_and_m1(res_dir: Path) -> Tuple[List[Dict[str, Any]], List[str]]:
+    exp9_dir = res_dir / "exp9_rust_and_scale"
+    mimo_dir = res_dir / "exp9_mimo_supplement"
+    pending: List[str] = []
+    if not exp9_dir.exists():
+        pending.append("results/exp9_rust_and_scale/")
+    if not mimo_dir.exists():
+        pending.append("results/exp9_mimo_supplement/")
 
     rows: List[Dict[str, Any]] = []
 
     # 1. R1-A1+D (Rust engines NUMA/HT/MT Trap 4)
-    p_a1d = exp8_dir / "r1_rust_a1d_numa.csv"
+    p_a1d = exp9_dir / "r1_rust_a1d_numa.csv"
     if p_a1d.exists():
         df = pd.read_csv(p_a1d)
         if {"regime", "engine", "trace"}.issubset(df.columns):
@@ -1024,16 +1028,16 @@ def ingest_exp8_rust_and_10m_scale(res_dir: Path) -> Tuple[List[Dict[str, Any]],
                     if units:
                         rows.append(_aggregate_unit_results(
                             trap="Trap 4: Contention & NUMA",
-                            suite_id=f"exp8_r1_a1d_{reg}_{metric}",
+                            suite_id=f"exp9_r1_a1d_{reg}_{metric}",
                             suite_label=f"Rust Engines 100K ({reg})",
-                            source_type="exp8_rust_10m",
+                            source_type="exp9_rust_10m",
                             comparison=f"{reg} vs iso_numa0_1w",
                             metric=metric,
                             units=units,
                         ))
 
     # 2. R1-A4 (Rust Core-0 >=95% Floor)
-    p_a4 = exp8_dir / "r1_rust_a4_floor.csv"
+    p_a4 = exp9_dir / "r1_rust_a4_floor.csv"
     if p_a4.exists():
         df = pd.read_csv(p_a4)
         if {"engine", "config", "total_cpu_s", "att_0965_pct"}.issubset(df.columns):
@@ -1043,16 +1047,16 @@ def ingest_exp8_rust_and_10m_scale(res_dir: Path) -> Tuple[List[Dict[str, Any]],
                 u = compare_rankings(g["_arm"].tolist(), g["total_cpu_s"].tolist(), (-g["att_0965_pct"]).tolist(), higher_is_better=False)
                 rows.append(_aggregate_unit_results(
                     trap="Trap 4: Contention & NUMA",
-                    suite_id="exp8_r1_a4_unmatched_cpu_vs_att",
+                    suite_id="exp9_r1_a4_unmatched_cpu_vs_att",
                     suite_label="Rust Engines (hnsw_rs + USearch-Rust A4)",
-                    source_type="exp8_rust_10m",
+                    source_type="exp9_rust_10m",
                     comparison="Unmatched total_cpu_s vs Recall@10>=0.965 Attainment",
                     metric="cpu_vs_attainment",
                     units=[u],
                 ))
 
     # 3. S1 (Gate-4 Clean Dual Xeon Core-0 1M Drift & CRUD-20%)
-    p_s1 = exp8_dir / "s1_xeon_1m_gate4_clean.csv"
+    p_s1 = exp9_dir / "s1_xeon_1m_gate4_clean.csv"
     if p_s1.exists():
         df = pd.read_csv(p_s1)
         df_ok = df[df["status"] == "ok"].copy() if "status" in df.columns else df.copy()
@@ -1065,16 +1069,46 @@ def ingest_exp8_rust_and_10m_scale(res_dir: Path) -> Tuple[List[Dict[str, Any]],
             if units:
                 rows.append(_aggregate_unit_results(
                     trap="Trap 4: Contention & NUMA",
-                    suite_id="exp8_s1_1m_core0_cpu_vs_att",
+                    suite_id="exp9_s1_1m_core0_cpu_vs_att",
                     suite_label="Xeon Core-0 BigANN-1M (5 Engines)",
-                    source_type="exp8_rust_10m",
+                    source_type="exp9_rust_10m",
                     comparison="Gate-4 clean total_cpu_s vs Recall@10>=0.965",
                     metric="cpu_vs_attainment",
                     units=units,
                 ))
 
-    # 4. S2-NUMA10M (10M Scale Trap 4 Contention & Cross-NUMA Flips)
-    p_n10 = exp8_dir / "s2_numa_10m_trap4.csv"
+    # 4. S2-Scale (BigANN 1M->10M Fixed-Knob Attainment Flip across 2M/5M/10M)
+    p_s2 = exp9_dir / "s2_scale_1m_to_10m.csv"
+    if p_s2.exists():
+        df = pd.read_csv(p_s2)
+        df_ok = df[df["status"] == "ok"].copy() if "status" in df.columns else df.copy()
+        if {"trace", "scale", "engine", "config", "dyn_wall_s", "att_0965_pct"}.issubset(df_ok.columns):
+            df_ok["_arm"] = df_ok["engine"].astype(str) + "_" + df_ok["config"].astype(str)
+            for sc_tag, sid_tag in [("2M", "2m"), ("5M", "5m"), ("10M", "10m")]:
+                sub_sc = df_ok[df_ok["scale"] == sc_tag]
+                units_sc = []
+                for tr, grp in sub_sc.groupby("trace"):
+                    if len(grp) >= 2:
+                        # Unmatched dyn_wall_s vs floor-penalized dyn_wall_s (below-95% attainment penalized)
+                        raw_w = grp["dyn_wall_s"].astype(float).tolist()
+                        flr_w = [
+                            float(r["dyn_wall_s"]) if float(r["att_0965_pct"]) >= 95.0 else 1e9 + float(r["dyn_wall_s"])
+                            for _, r in grp.iterrows()
+                        ]
+                        units_sc.append(compare_rankings(grp["_arm"].tolist(), raw_w, flr_w, higher_is_better=False))
+                if units_sc:
+                    rows.append(_aggregate_unit_results(
+                        trap="Trap 4: Contention & NUMA",
+                        suite_id=f"exp9_s2_bigann_{sid_tag}_wall_vs_floor",
+                        suite_label=f"BigANN-{sc_tag} Scale Drift & CRUD (Wall vs Floor)",
+                        source_type="exp9_rust_10m",
+                        comparison="Uncalibrated dyn_wall_s vs Floor@0.965>=95% rank",
+                        metric="dyn_wall_vs_floor",
+                        units=units_sc,
+                    ))
+
+    # 5. S2-NUMA10M (10M Scale Trap 4 Contention & Cross-NUMA Flips, when >=2 engines populated)
+    p_n10 = exp9_dir / "s2_numa_10m_trap4.csv"
     if p_n10.exists():
         df = pd.read_csv(p_n10)
         if {"regime", "engine", "dyn_wall_s", "p99_us"}.issubset(df.columns):
@@ -1088,33 +1122,101 @@ def ingest_exp8_rust_and_10m_scale(res_dir: Path) -> Tuple[List[Dict[str, Any]],
                     u = compare_rankings(common, [float(sub.loc[e, metric]) for e in common], [float(iso.loc[e, metric]) for e in common], higher_is_better=False)
                     rows.append(_aggregate_unit_results(
                         trap="Trap 4: Contention & NUMA",
-                        suite_id=f"exp8_s2_10m_{reg}_{metric}",
+                        suite_id=f"exp9_s2_10m_{reg}_{metric}",
                         suite_label=f"BigANN-10M ({reg})",
-                        source_type="exp8_rust_10m",
+                        source_type="exp9_rust_10m",
                         comparison=f"10M {reg} vs iso_numa0_8t",
                         metric=metric,
                         units=[u],
                     ))
-            # Pooled 10M NUMA metrics across the 3 contended tiers
-            for metric in [m for m in ("dyn_wall_s", "p99_us") if m in df.columns]:
-                units_all = []
-                for reg in ("ht_sibling_8t", "cross_numa_8t", "unpinned_16t"):
-                    sub = df[df["regime"] == reg].set_index("engine")
-                    common = sorted(set(iso.index) & set(sub.index))
-                    if len(common) >= 2:
-                        units_all.append(compare_rankings(common, [float(sub.loc[e, metric]) for e in common], [float(iso.loc[e, metric]) for e in common], higher_is_better=False))
-                if units_all:
+
+    # 6. Exp 9 M1 Live 16-Shard Scheduler Bridge (Trap 2 Clock Leakage on Real C++ Engines)
+    p_m1 = mimo_dir / "m1_real_engine_scheduler_bridge.csv"
+    if p_m1.exists():
+        df = pd.read_csv(p_m1)
+        for eng, eng_lbl, base_arms in [
+            ("sharded_faiss_ivf", "16-sh FAISS-IVF Bridge", ["past_qmass", "ewma_a03", "online_milp", "fixed_c2", "fixed_c4", "noop"]),
+            ("sharded_hnswlib", "16-sh hnswlib Bridge", ["past_qmass", "ewma_a03", "fixed_c2", "noop"]),
+        ]:
+            sub = df[df["engine"] == eng]
+            for metric in ("total_cpu_s", "exact_scan_ops"):
+                units_m1 = []
+                for _, grp in sub.groupby("trace"):
+                    s = grp.set_index("policy")
+                    if not ({"gbrt_leaky", "gbrt_causal"} | set(base_arms)).issubset(set(s.index)):
+                        continue
+                    slots = ["GBRT"] + base_arms
+                    v_l = [float(s.loc["gbrt_leaky", metric])] + [float(s.loc[b, metric]) for b in base_arms]
+                    v_c = [float(s.loc["gbrt_causal", metric])] + [float(s.loc[b, metric]) for b in base_arms]
+                    units_m1.append(compare_rankings(slots, v_l, v_c, higher_is_better=False))
+                if units_m1:
                     rows.append(_aggregate_unit_results(
-                        trap="Trap 4: Contention & NUMA",
-                        suite_id=f"exp8_s2_10m_pooled_{metric}",
-                        suite_label="BigANN-10M Trap 4 (HT/Cross-NUMA/16t)",
-                        source_type="exp8_rust_10m",
-                        comparison="Contended 10M vs iso_numa0_8t",
+                        trap="Trap 2: Clock Leakage",
+                        suite_id=f"exp9_m1_{eng}_{metric}",
+                        suite_label=f"Exp9 M1 {eng_lbl}",
+                        source_type="exp9_mimo_m1",
+                        comparison="GBRT-Leaky vs GBRT-Causal on live sharded engine",
                         metric=metric,
-                        units=units_all,
+                        units=units_m1,
                     ))
 
-    return rows, []
+    # 7. Exp 9 M2 Quantized Backends Audit (39 Core-8 runs: 26 Drift + 13 CRUD-30% across FP32/SQ8/PQ/FP16/INT8)
+    p_m2 = mimo_dir / "m2_quantized_backends.csv"
+    if p_m2.exists():
+        df = pd.read_csv(p_m2)
+        for wl_key, sid_sfx, lbl_sfx in [
+            ("drift", "drift", "Drift"),
+            ("crud30", "crud30", "CRUD-30%"),
+        ]:
+            sub = df[(df["workload"] == wl_key) & (df["status"] == "ok")].copy()
+            if len(sub) >= 6 and {"trace", "system", "param_tag", "total_cpu_s", "att_0965_pct"}.issubset(sub.columns):
+                sub["_arm"] = sub["system"].astype(str) + "_" + sub["param_tag"].astype(str)
+                units_m2 = []
+                for _, grp in sub.groupby("trace"):
+                    if len(grp) >= 2:
+                        units_m2.append(compare_rankings(grp["_arm"].tolist(), grp["total_cpu_s"].astype(float).tolist(), (-grp["att_0965_pct"]).astype(float).tolist(), higher_is_better=False))
+                if units_m2:
+                    rows.append(_aggregate_unit_results(
+                        trap="Trap 4: Contention & NUMA",
+                        suite_id=f"exp9_m2_quantized_{sid_sfx}_cpu_vs_att",
+                        suite_label=f"Exp9 M2 Quantized {lbl_sfx} (SQ8/PQ/FP16/INT8)",
+                        source_type="exp9_mimo_m2",
+                        comparison="Unmatched quantized total_cpu_s vs Recall@10>=0.965 Attainment",
+                        metric="cpu_vs_attainment",
+                        units=units_m2,
+                    ))
+
+    # 8. Exp 9 M3 Real-Engine Query-to-Update (Q/u) Crossover Boundary (30 Core-8 runs)
+    p_m3 = mimo_dir / "m3_qu_crossover_real_engines.csv"
+    if p_m3.exists():
+        df = pd.read_csv(p_m3)
+        if len(df) == 30 and {"u_pct", "q_per_win", "system", "total_cpu_s"}.issubset(df.columns):
+            read_heavy = df[(df["u_pct"] == 2) & (df["q_per_win"] == 20000)].set_index("system")["total_cpu_s"]
+            units_m3 = []
+            for (u_v, q_v), grp in df.groupby(["u_pct", "q_per_win"]):
+                if (int(u_v), int(q_v)) == (2, 20000):
+                    continue
+                s_cell = grp.set_index("system")["total_cpu_s"]
+                common = sorted(set(read_heavy.index) & set(s_cell.index))
+                if len(common) >= 2:
+                    units_m3.append(compare_rankings(
+                        common,
+                        [float(s_cell[e]) for e in common],
+                        [float(read_heavy[e]) for e in common],
+                        higher_is_better=False,
+                    ))
+            if units_m3:
+                rows.append(_aggregate_unit_results(
+                    trap="Trap 4: Contention & NUMA",
+                    suite_id="exp9_m3_qu_regime_crossover_cpu",
+                    suite_label="Exp9 M3 Real-Engine Q/u Crossover (<=2.5 vs 10.0)",
+                    source_type="exp9_mimo_m3",
+                    comparison="Write-moderate Q/u<=2.5 vs Read-heavy Q/u=10.0 total_cpu_s",
+                    metric="total_cpu_s",
+                    units=units_m3,
+                ))
+
+    return rows, pending
 
 
 def build_matrix(res_dir: Path = RES) -> Dict[str, Any]:
@@ -1127,11 +1229,11 @@ def build_matrix(res_dir: Path = RES) -> Dict[str, Any]:
     exp6_rows, exp6_pending = ingest_exp6_real_engine_traps(res_dir)
     exp7_rows, exp7_pending = ingest_exp7_gpu_1m_arxiv(res_dir)
     colab_rows, colab_pending = ingest_colab_1m_audit(res_dir)
-    exp8_rows, exp8_pending = ingest_exp8_rust_and_10m_scale(res_dir)
+    exp9_rows, exp9_pending = ingest_exp9_rust_scale_and_m1(res_dir)
     all_rows.extend(exp6_rows)
     all_rows.extend(exp7_rows)
     all_rows.extend(colab_rows)
-    all_rows.extend(exp8_rows)
+    all_rows.extend(exp9_rows)
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     df_out = pd.DataFrame(all_rows)
@@ -1141,7 +1243,7 @@ def build_matrix(res_dir: Path = RES) -> Dict[str, Any]:
 
     payload = {
         "n_rows": len(all_rows),
-        "pending_optional_sources": exp6_pending + exp7_pending + colab_pending + exp8_pending,
+        "pending_optional_sources": exp6_pending + exp7_pending + colab_pending + exp9_pending,
         "headline_summary": {
             "trap4_dirty_vs_clean_18grids": next((r for r in all_rows if r["suite_id"] == "trap4_dirty_vs_clean_18grids"), None),
             "trap1_all_local_pooled": next((r for r in all_rows if r["suite_id"] == "trap1_all_local_pooled"), None),

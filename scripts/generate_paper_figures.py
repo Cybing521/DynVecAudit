@@ -355,7 +355,7 @@ def make_fig4() -> Path:
     yp = np.arange(len(names))
     bars = ax2.barh(yp, vals, height=0.62, color=colors, edgecolor=PAL["ink"], linewidth=0.6)
     ax2.axvline(0.70, color=PAL["rose_edge"], linestyle="--", linewidth=1.1)
-    ax2.text(0.74, 0.75, "Gate 2\n(|\u03c1|=0.70)", ha="left", va="bottom", fontsize=8.0,
+    ax2.text(0.74, 0.75, "Check S\n(|\u03c1|=0.70)", ha="left", va="bottom", fontsize=8.0,
              fontweight="bold", color=PAL["rose_edge"])
     for b, v, ec in zip(bars, vals, edges):
         ax2.text(v + 0.03, b.get_y() + b.get_height() / 2, f"{v:.3f}",
@@ -835,21 +835,26 @@ def make_fig7() -> Path:
                columnspacing=0.35, handlelength=0.80, labelspacing=0.12)
     panel_tag(ax2, "B", x=-0.26, y=1.24)
 
-    s2_10m = pd.read_csv(RES / "exp9_rust_and_scale" / "s2_scale_1m_to_10m.csv")
+    s2_10m = pd.concat([
+        pd.read_csv(RES / "exp9_rust_and_scale" / "s2_scale_1m_to_10m.csv"),
+        pd.read_csv(RES / "exp9_rust_and_scale" / "s2_5m_10m_ef_calibration.csv"),
+    ], ignore_index=True)
+    b1_all = pd.concat([
+        pd.read_csv(RES / "exp11" / "exp11b1_baremetal_real768.csv"),
+        pd.read_csv(RES / "exp11" / "exp11b1_ext_graph_knobs.csv"),
+    ], ignore_index=True).drop_duplicates(subset=["workload", "seed", "system", "param_tag"], keep="last")
+    b1_1m = b1_all[b1_all["workload"] == "1M_Drift"].groupby(["system", "param_tag"], as_index=False)[["query_pct", "maint_pct", "total_cpu_s", "att_0965_pct"]].mean()
     rows_c = []
-    for wl_df, picks in [
-        (d8_768, [("faiss_hnsw", "ef64", "768d F-HNSW"), ("hnswlib", "ef64", "768d hnswlib"), ("faiss_ivf", "np16", "768d IVF np16")]),
-        (d8_1m, [("faiss_ivf", "np32", "1M-A IVF np32"), ("hnswlib", "ef64", "1M-A hnswlib"), ("diskann", "L64", "1M-A DiskANN")]),
-    ]:
-        for sy, pt, lbl in picks:
-            m = wl_df[(wl_df["system"] == sy) & (wl_df["param_tag"] == pt)].iloc[0]
-            rows_c.append((lbl, float(m["query_cpu_pct"]), float(m["maint_cpu_pct"]), f"{float(m['rel_cpu_vs_faiss_base']):.2f}\u00d7 ({float(m['attainment_0965_pct']):.0f}%)"))
+    for sy, pt, lbl in [("faiss_ivf", "np64", "768d IVF np64"), ("faiss_hnsw", "ef128", "768d F-HNSW"), ("hnswlib", "ef128", "768d hnswlib"), ("diskann", "L128", "768d DiskANN")]:
+        m = b1_1m[(b1_1m["system"] == sy) & (b1_1m["param_tag"] == pt)].iloc[0]
+        rows_c.append((lbl, float(m["query_pct"]), float(m["maint_pct"]), f"{float(m['total_cpu_s']):.0f}s ({float(m['att_0965_pct']):.0f}%)"))
     for df_src, tr_n, picks in [
-        (s1_1m, "bigann_1m_drift", [("faiss_ivf", "np32", "1M-X IVF np32"), ("hnswlib", "ef128", "1M-X hnswlib"), ("usearch_rust", "ef128", "1M-X US-R")]),
-        (s2_10m, "bigann_10m_drift", [("faiss_ivf", "np64", "10M IVF np64"), ("hnswlib", "ef96", "10M hnswlib"), ("usearch_rust", "ef96", "10M US-R")]),
+        (s1_1m, "bigann_1m_drift", [("faiss_ivf", "np32", "1M IVF np32"), ("hnswlib", "ef128", "1M hnswlib"), ("usearch_rust", "ef128", "1M US-R")]),
+        (s1_1m, "bigann_1m_crud20", [("faiss_ivf", "np64", "1M-C IVF np64"), ("usearch_rust", "ef128", "1M-C US-R"), ("hnswlib", "ef128", "1M-C hnswlib")]),
+        (s2_10m, "bigann_10m_drift", [("faiss_ivf", "np64", "10M IVF np64"), ("hnswlib", "ef192", "10M hnswlib ef192"), ("usearch_rust", "ef192", "10M US-R ef192")]),
     ]:
         for sy, pt, lbl in picks:
-            m = df_src[(df_src["trace"] == tr_n) & (df_src["engine"] == sy) & (df_src["config"] == pt)].iloc[0]
+            m = df_src[(df_src["trace"] == tr_n) & (df_src["engine"] == sy) & (df_src["config"] == pt)].iloc[-1]
             rows_c.append((lbl, float(m["query_pct"]), float(m["maint_pct"]), f"{float(m['total_cpu_s']):.1f}s ({float(m['att_0965_pct']):.0f}%)"))
 
     yc = np.arange(len(rows_c))
@@ -859,15 +864,15 @@ def make_fig7() -> Path:
     ax3.barh(yc, m_pct, left=q_pct, height=0.62, facecolor=PAL["mint_fill"], edgecolor=PAL["ink"], linewidth=0.58, label="Maint %")
     for idx, (_, _, _, tag_str) in enumerate(rows_c):
         ax3.text(103.0, idx, tag_str, va="center", ha="left", fontsize=8.1, color=PAL["ink"])
-    ax3.axhline(2.5, color=PAL["ref"], linestyle=":", linewidth=0.8)
-    ax3.axhline(5.5, color=PAL["ref"], linestyle=":", linewidth=0.8)
-    ax3.axhline(8.5, color=PAL["ref"], linestyle=":", linewidth=0.8)
+    ax3.axhline(3.5, color=PAL["ref"], linestyle=":", linewidth=0.8)
+    ax3.axhline(6.5, color=PAL["ref"], linestyle=":", linewidth=0.8)
+    ax3.axhline(9.5, color=PAL["ref"], linestyle=":", linewidth=0.8)
     ax3.set_yticks(yc)
-    ax3.set_yticklabels([r[0] for r in rows_c], fontsize=8.1)
+    ax3.set_yticklabels([r[0] for r in rows_c], fontsize=7.8)
     ax3.set_xticks([0, 25, 50, 75, 100])
     ax3.set_xticklabels(["0", "25", "50", "75", "100"], fontsize=8.1)
-    ax3.set_xlabel("CPU Split (%) [Cost/Rel., Att.]", fontsize=8.5)
-    ax3.set_xlim(0, 206)
+    ax3.set_xlabel("CPU Split (%) [Bare-metal CPU, Att.]", fontsize=8.5)
+    ax3.set_xlim(0, 224)
     ax3.legend(loc="lower center", bbox_to_anchor=(0.48, 1.01), ncol=2, fontsize=8.1,
                columnspacing=0.35, handlelength=0.80, labelspacing=0.12)
     panel_tag(ax3, "C", x=-0.36, y=1.24)

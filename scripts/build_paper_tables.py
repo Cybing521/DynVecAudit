@@ -496,7 +496,7 @@ def build_tab_exp2_combined() -> Dict[str, object]:
         "\\centering",
         "\\small",
         "\\renewcommand{\\arraystretch}{0.92}",
-        "\\caption{Traps 1--2 diagnostic ledger: (a) Clean Ryzen 9 9950X Core-8 study (25 SIFT-128 traces, 575 runs; 25/25 traces bracketed by executed $c\\in\\{1..8\\}$, $0.000$ Top-1 agreement at abrupt $j=5$); (b) $2{\\times}2$ Fixed-Hub vs.\\ Randomized-Hub de-leakage ablation on Dual EPYC 7343 ($n=100$ runs). Italicized Oracle and Gate-2-flagged leaky rows sit above the rule; bold/underline rank valid causal policies.}",
+        "\\caption{Checks C and S diagnostic ledger: (a) Clean Ryzen 9 9950X Core-8 study (25 SIFT-128 traces, 575 runs; 25/25 traces bracketed by executed $c\\in\\{1..8\\}$, $0.000$ Top-1 agreement at abrupt $j=5$); (b) $2{\\times}2$ Fixed-Hub vs.\\ Randomized-Hub de-leakage ablation on Dual EPYC 7343 ($n=100$ runs). Italicized Oracle and Check-S-flagged leaky rows sit above the rule; bold/underline rank valid causal policies.}",
         "\\label{tab:exp2_traps12}",
         "\\begin{minipage}[t]{0.53\\textwidth}",
         "\\centering",
@@ -530,7 +530,7 @@ def build_tab_exp2_combined() -> Dict[str, object]:
         "\\resizebox{\\linewidth}{!}{%",
         "\\begin{tabular}{lrrrr}",
         "\\toprule",
-        "\\multicolumn{5}{c}{\\textbf{(b) Trap 2 $2{\\times}2$ De-Leakage ($n=100$)}} \\\\",
+        "\\multicolumn{5}{c}{\\textbf{(b) Check S $2{\\times}2$ De-Leakage ($n=100$)}} \\\\",
         "\\midrule",
         "Policy & Fix CPU $\\downarrow$ & Fix GCR $\\uparrow$ & Rnd CPU $\\downarrow$ & Rnd GCR $\\uparrow$ \\\\",
         "\\midrule",
@@ -979,7 +979,7 @@ def build_tab_real_engines_1m_arxiv() -> Dict[str, object]:
         "\\centering",
         "\\small",
         "\\renewcommand{\\arraystretch}{0.86}",
-        "\\caption{Cross-engine audit across eight backends: (a) Dual Xeon 8352V Core-0 Gate-4 clean ($\\text{w/C}\\le 1.105$) recall floor, Rust \\texttt{usearch\\_rust}/\\texttt{hnsw\\_rs}, bare-metal \\texttt{BigANN-1M}, and NUMA-0 8t \\texttt{BigANN-5M/10M} scaling; (b) A100/T4 GPU-GT semantic Dimension $\\times$ Scale Crossover (140K 768-d, 120K AG News, 500K/1M 384-d; raw vCPU timings withheld). 100K CRUD \\texttt{FAISS-IVF (np24)} runs on isolated core 40 (NUMA-1, idle sibling, w/C $\\le 1.018$). Below-floor configs ($^\\dagger$) are excluded from cost/latency/RSS ranking. $^*$VM Rel.\\ reports same-VM single-pinned ratios ($\\text{w/C}\\le 1.01$, subject to up to $\\sim 18\\%$ cross-engine SMT uncertainty); hardware-invariant Rec., Att., Q/M, and VmHWM are primary Gate-4-clean metrics.}",
+        "\\caption{Floor-calibrated engine comparisons. (a) Dual Xeon 8352V, Check-P clean ($\\text{w/C}\\le 1.105$): 100K SIFT drift and CRUD (Core-0; 100K CRUD \\texttt{FAISS-IVF (np24)} on isolated core 40, w/C $\\le 1.018$), BigANN 1M (Core-0), and BigANN 5M/10M (NUMA-0, 8 threads). (b) Wikipedia 768-d embeddings on isolated Xeon NUMA-1 physical cores (52/56/58/60, idle HT siblings), mean of 3 seeds (w/C $\\le 1.0005$). Configurations that miss the floor in any run ($^\\dagger$) are excluded from cost and latency ranking; Maint.\\ is the maintenance share of CPU.}",
         "\\label{tab:real_engines_1m_arxiv}",
         "\\begin{minipage}[t]{0.49\\textwidth}",
         "\\centering",
@@ -1063,14 +1063,17 @@ def build_tab_real_engines_1m_arxiv() -> Dict[str, object]:
 
     s2_raw = pd.read_csv(RES / "exp9_rust_and_scale" / "s2_scale_1m_to_10m.csv")
     s2_raw.to_csv(OUT_CSV / "tab_s2_scale_1m_to_10m.csv", index=False)
+    # ef calibration (ef96 -> ef192) for the graph engines at 5M/10M
+    s2_cal = pd.read_csv(RES / "exp9_rust_and_scale" / "s2_5m_10m_ef_calibration.csv")
+    s2_raw = pd.concat([s2_raw, s2_cal[s2_cal["config"] == "ef192"]], ignore_index=True)
     s2_picks = {
-        "bigann_5m_drift": [("faiss_ivf", "np64"), ("hnswlib", "ef96"), ("usearch_rust", "ef96")],
-        "bigann_10m_drift": [("faiss_ivf", "np64"), ("hnswlib", "ef96"), ("usearch_rust", "ef96")],
-        "bigann_10m_crud20": [("faiss_ivf", "np64"), ("usearch_rust", "ef96")],
+        "bigann_5m_drift": [("faiss_ivf", "np64"), ("hnswlib", "ef96"), ("hnswlib", "ef192"), ("usearch_rust", "ef192")],
+        "bigann_10m_drift": [("faiss_ivf", "np64"), ("hnswlib", "ef96"), ("hnswlib", "ef192"), ("usearch_rust", "ef192")],
+        "bigann_10m_crud20": [("faiss_ivf", "np64"), ("usearch_rust", "ef96"), ("usearch_rust", "ef192")],
     }
     s2_disp = {"bigann_5m_drift": "5M Drift (8t)", "bigann_10m_drift": "10M Drift (8t)", "bigann_10m_crud20": "10M CRUD20"}
     for wl in ["bigann_5m_drift", "bigann_10m_drift", "bigann_10m_crud20"]:
-        sub = s2_raw[(s2_raw["trace"] == wl) & s2_raw.apply(lambda r: (r["engine"], r["config"]) in s2_picks[wl], axis=1)].copy()
+        sub = s2_raw[(s2_raw["trace"] == wl) & s2_raw.apply(lambda r: (r["engine"], r["config"]) in s2_picks[wl], axis=1)].drop_duplicates(subset=["engine", "config"], keep="first").copy()
         if sub.empty:
             continue
         lines.append("\\midrule")
@@ -1101,45 +1104,44 @@ def build_tab_real_engines_1m_arxiv() -> Dict[str, object]:
         "\\resizebox{\\linewidth}{!}{%",
         "\\begin{tabular}{llrrrrrr}",
         "\\toprule",
-        "\\multicolumn{8}{c}{\\textbf{(b) A100/T4 GPU-GT Semantic Dimension $\\times$ Scale Crossover}} \\\\",
+        "\\multicolumn{8}{c}{\\textbf{(b) Wikipedia 768-d, Xeon bare metal (Exp 11-B1, $n=3$ seeds)}} \\\\",
         "\\midrule",
-        "Workload & Engine (Cfg) & Rec. $\\uparrow$ & MinR $\\uparrow$ & Att.@.965 $\\uparrow$ & Split (Q/M) & VmHWM $\\downarrow$ & VM Rel.$^*$ $\\downarrow$ \\\\",
+        "Workload & Engine (Cfg) & CPU (s) $\\downarrow$ & $\\pm$sd & Rec. $\\uparrow$ & Att.@.965 $\\uparrow$ & Maint. & $p_{99}$ (ms) $\\downarrow$ \\\\",
         "\\midrule",
     ])
-    wl_exp8_disp = {
-        "arxiv140k_768d_drift": "arXiv 140K 768-d",
-        "agnews_minilm384": "AG News 384-d",
-        "arxiv500k_drift": "arXiv 500K 384-d",
-        "arxiv500k_crud30": "500K CRUD-30\\%",
-        "arxiv1m_384d_drift": "arXiv 1M 384-d",
-    }
-    wl_order = ["arxiv140k_768d_drift", "agnews_minilm384", "arxiv500k_drift", "arxiv500k_crud30", "arxiv1m_384d_drift"]
-    for idx_w, wl in enumerate(wl_order):
-        sub = exp8_all[(exp8_all["workload"] == wl) & exp8_all.apply(lambda r: (r["system"], r["param_tag"]) in keep_exp8[wl], axis=1)].copy()
-        sub["ord"] = sub.apply(lambda r: keep_exp8[wl].index((r["system"], r["param_tag"])), axis=1)
+    b1_parts = [pd.read_csv(RES / "exp11" / "exp11b1_baremetal_real768.csv")]
+    b1_ext = RES / "exp11" / "exp11b1_ext_graph_knobs.csv"
+    if b1_ext.exists():
+        b1_parts.append(pd.read_csv(b1_ext))
+    b1 = pd.concat(b1_parts, ignore_index=True).drop_duplicates(
+        subset=["workload", "seed", "system", "param_tag"], keep="last"
+    )
+    b1g = b1.groupby(["workload", "system", "param_tag"], as_index=False).agg(
+        cpu=("total_cpu_s", "mean"), sd=("total_cpu_s", "std"), rec=("mean_recall", "mean"),
+        att=("att_0965_pct", "mean"), att_min=("att_0965_pct", "min"), maint=("maint_pct", "mean"), p99=("mean_p99_us", "mean"))
+    b1g.to_csv(OUT_CSV / "tab_b1_real768_baremetal.csv", index=False)
+    b1_picks = [
+        ("faiss_ivf", "np32"), ("faiss_ivf", "np64"),
+        ("hnswlib", "ef64"), ("hnswlib", "ef128"),
+        ("faiss_hnsw", "ef64"), ("faiss_hnsw", "ef128"),
+        ("diskann", "L64"), ("diskann", "L128"),
+        ("usearch", "ef64"), ("usearch", "ef128"),
+    ]
+    b1_wl = [("140K_Drift", "140K drift"), ("500K_Drift", "500K drift"), ("500K_CRUD20", "500K CRUD-20"), ("1M_Drift", "1M drift")]
+    b1_disp = {"faiss_ivf": "FAISS-IVF", "hnswlib": "hnswlib", "faiss_hnsw": "FAISS-HNSW", "diskann": "FreshDiskANN", "usearch": "USearch"}
+    for idx_w, (wl, wl_lab) in enumerate(b1_wl):
+        sub = b1g[(b1g["workload"] == wl) & b1g.apply(lambda r: (r["system"], r["param_tag"]) in b1_picks, axis=1)].copy()
+        sub["ord"] = sub.apply(lambda r: b1_picks.index((r["system"], r["param_tag"])), axis=1)
         sub = sub.sort_values("ord").reset_index(drop=True)
-        ok_all = [bool(r["status"] == "ok") for _, r in sub.iterrows()]
-        elig_b = [bool(r["status"] == "ok" and r["attainment_0965_pct"] >= 95.0) for _, r in sub.iterrows()]
-        rf = _rank_format(sub["mean_recall"].tolist(), True, ".4f", eligible=ok_all)
-        mrf = _rank_format(sub["min_recall"].tolist(), True, ".4f", eligible=ok_all)
-        af = _rank_format(sub["attainment_0965_pct"].tolist(), True, ".1f", eligible=ok_all)
-        rssf = _rank_format(sub["peak_rss_mb"].tolist(), False, ".0f", eligible=elig_b)
-        relf = _rank_format(sub["rel_cpu_vs_faiss_np16"].tolist(), False, ".2f", eligible=elig_b)
+        elig = [bool(r["att_min"] >= 95.0) for _, r in sub.iterrows()]
+        cf = _rank_format(sub["cpu"].tolist(), False, ".1f", eligible=elig)
+        pf = _rank_format((sub["p99"] / 1000.0).tolist(), False, ".2f", eligible=elig)
         for i, r in sub.iterrows():
-            wl_c = wl_exp8_disp[wl] if i == 0 else ""
-            tag = r["param_tag"].replace("_", "\\_")
-            eng = f"{sys_disp[r['system']]} ({tag})"
-            if r["status"] != "ok":
-                lines.append(f"{wl_c} & {eng} & \\multicolumn{{4}}{{c}}{{\\texttt{{unsupported\\_erase}}}} & {r['peak_rss_mb']:.0f} & -- \\\\")
-            else:
-                ok = elig_b[i]
-                dag = "" if ok else "$^\\dagger$"
-                prefix = "\\ccrow " if ok and (r["system"] in ("hnswlib", "faiss_hnsw", "faiss_ivf") and ((wl in ("arxiv140k_768d_drift", "agnews_minilm384") and r["system"] in ("hnswlib", "faiss_hnsw")) or (wl in ("arxiv500k_drift", "arxiv500k_crud30", "arxiv1m_384d_drift") and r["system"] == "faiss_ivf" and r["param_tag"] == "np32"))) else ""
-                split_s = f"{r['query_cpu_pct']:.0f}/{r['maint_cpu_pct']:.0f}\\%"
-                lines.append(
-                    f"{prefix}{wl_c} & {eng} & {rf[i]} & {mrf[i]} & {af[i]}\\%{dag} & {split_s} & {rssf[i]} & {relf[i]}$\\times$ \\\\"
-                )
-        if idx_w < len(wl_order) - 1:
+            wl_c = wl_lab if i == 0 else ""
+            dag = "" if elig[i] else "$^\\dagger$"
+            prefix = "\\ccrow " if elig[i] and r["system"] == "faiss_ivf" else ""
+            lines.append(f"{prefix}{wl_c} & {b1_disp[r['system']]} ({r['param_tag']}) & {cf[i]} & {r['sd']:.1f} & {r['rec']:.4f} & {r['att']:.1f}\\%{dag} & {r['maint']:.0f}\\% & {pf[i]} \\\\")
+        if idx_w < len(b1_wl) - 1:
             lines.append("\\midrule")
     lines.extend([
         "\\bottomrule",

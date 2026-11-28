@@ -159,57 +159,57 @@ def build() -> None:
     bg.line.fill.background()
 
     # Channel 1: WORKLOAD STREAMS (x=0.05..1.63)
-    add_channel(slide, 0.05, 0.06, 1.58, 2.60, "WORKLOAD STREAMS", "128-d–768-d, exact Top-10 GT")
+    add_channel(slide, 0.05, 0.06, 1.58, 2.60, "WORKLOAD STREAMS", "128-d–960-d, exact Top-10 GT")
     tsw_runs = [("Abrupt (", False, False), ("t", False, True), ("sw", True, False), (") & (u, Q) grid", False, False)]
     add_box(slide, 0.11, 0.46, 1.46, 0.65, [
-        ("Synthetic Drift Suites", 8.3, True, False),
-        ("SIFT-128 (100K → 10M)", 7.8, False, False),
-        (tsw_runs, 7.8, False, False),
+        ("Drift & Scale (100K–10M)", 8.2, True, False),
+        ("SIFT / BigANN / Wiki-768", 7.7, False, False),
+        (tsw_runs, 7.7, False, False),
     ], fill=GRAY_FILL)
     add_box(slide, 0.11, 1.19, 1.46, 0.65, [
-        ("Mixed CRUD & Runbook", 8.3, True, False),
-        ("30% / 50% Insert-Delete", 7.8, False, False),
-        ("0%–50% Tombstone Sweep", 7.8, False, False),
+        ("Mixed CRUD & Runbook", 8.2, True, False),
+        ("20% / 30% / 50% CRUD", 7.7, False, False),
+        ("0%–50% Tombstone Sweep", 7.7, False, False),
     ], fill=GRAY_FILL)
     add_box(slide, 0.11, 1.92, 1.46, 0.65, [
-        ("Real & Cross-Modal", 8.3, True, False),
-        ("arXiv 1M, AG News, Wiki", 7.8, False, False),
-        ("CLINC-150 & CLIP-512", 7.8, False, False),
+        ("Real & Pacing Suites", 8.2, True, False),
+        ("6 drift types, 2,400 replay traces", 7.7, False, False),
+        ("Wikimedia, CLINC, CLIP", 7.7, False, False),
     ], fill=GRAY_FILL)
 
     # Channel 2: DUAL-PLANE EXECUTION (x=1.81..3.59)
-    add_channel(slide, 1.81, 0.06, 1.78, 2.60, "DUAL-PLANE EXECUTION", "Pinned single-core + GPU-GT")
+    add_channel(slide, 1.81, 0.06, 1.78, 2.60, "DUAL-PLANE EXECUTION", "Isolated core + exact replay")
     add_box(slide, 1.87, 0.46, 1.66, 1.00, [
-        ("7 Codebases / 8 Backends", 8.4, True, False),
-        ("FAISS-IVF/HNSW | hnswlib | Quake", 7.8, False, False),
-        ("DiskANN | Annoy | USearch/R | hnsw_rs", 7.8, False, False),
-        ("Attain. ≥ 0.965, p99, VmHWM", 7.8, False, True),
+        ("7 Codebases / 8 Backends", 8.3, True, False),
+        ("FAISS-IVF/HNSW | hnswlib | Quake", 7.7, False, False),
+        ("DiskANN | Annoy | USearch/R | hnsw_rs", 7.7, False, False),
+        ("Attain. ≥ 0.965, p99, VmHWM", 7.7, False, True),
     ], fill=WHITE)
     add_box(slide, 1.87, 1.56, 1.66, 1.01, [
-        ("Replay & Sharded Bridge", 8.4, True, False),
-        ("qbam_replay + Rust CLI (5.58×)", 7.8, False, False),
-        ("Prop. 1 MILP & M1 Real Shards", 7.8, False, False),
-        ("Causal vs. Leaky, c ∈ {1..8}", 7.8, False, False),
+        ("Replay & Paced 16-Sh. Bridge", 8.3, True, False),
+        ("Prop. 1 MILP & 5.58× Rust CLI", 7.7, False, False),
+        ("Paced vs. Greedy (Exp 11-A/B)", 7.7, False, False),
+        ("Causal vs. Leaky, c ∈ {1..8}", 7.7, False, False),
     ], fill=GRAY_FILL)
 
     # Orthogonal Bus Ch1 -> Ch2 (box midpoints -> box midpoints)
     add_bus(slide, 1.57, 1.72, 1.87, [0.785, 1.515, 2.245], [0.960, 2.065])
 
-    # Channel 3: FOUR HYGIENE GATES (x=3.77..5.85)
-    add_channel(slide, 3.77, 0.06, 2.08, 2.60, "FOUR HYGIENE GATES", "Quantitative flip rejection")
-    g2_desc = [("Rand. hub + ", False, False), ("t", False, True), ("sw", True, False), (" + |ρ| < 0.70", False, False)]
+    # Channel 3: THREE-ACT AUDIT GATES (x=3.77..5.85)
+    add_channel(slide, 3.77, 0.06, 2.08, 2.60, "THREE-ACT AUDIT CHECKS", "Five calibrated rules (Q,P,C,S,H)")
+    g2_desc = [("S: Rand. hub+", False, False), ("t", False, True), ("sw", True, False), (", |ρ|<0.70; H: end+refresh", False, False)]
     gates = [
-        ("Gate 1: Cadence Bracket", "Executed c ∈ {1..8} (-10.6%..+18.3%)"),
-        ("Gate 2: Split & Clock Leak", g2_desc),
-        ("Gate 3: Full-Horizon CF", "Trace-end credit & refresh (-17%)"),
-        ("Gate 4: NUMA Isolation", "Pin + w/C ≤ 1.18 + probe ≤ 1.25×"),
+        ("Act 1 — Quality (Q)", "≥95% windows at ≥0.965 recall"),
+        ("Act 2 — Placement (P)", "Idle sibling, w/C ≤ 1.18, probe ≤ 1.25×"),
+        ("Act 3 — Split & Horizon (S,H)", g2_desc),
+        ("Act 3 — Cadence & Pacing (C)", "Bracket c,c+1; cap ⌊Bj/(J-1)⌋"),
     ]
     gate_mids = []
     gy = 0.46
     for title_g, desc_g in gates:
         add_box(slide, 3.83, gy, 1.96, 0.47, [
-            (title_g, 8.2, True, False),
-            (desc_g, 7.8, False, False),
+            (title_g, 8.1, True, False),
+            (desc_g, 7.6, False, False),
         ], fill=WHITE)
         gate_mids.append(gy + 0.235)
         gy += 0.545
@@ -218,21 +218,21 @@ def build() -> None:
     add_bus(slide, 3.53, 3.68, 3.83, [0.960, 2.065], gate_mids)
 
     # Channel 4: AUDITED OUTPUTS (x=6.03..7.15)
-    add_channel(slide, 6.03, 0.06, 1.12, 2.60, "OUTPUTS", "4,855-run audit")
+    add_channel(slide, 6.03, 0.06, 1.12, 2.60, "OUTCOMES", "5,462 runs")
     add_box(slide, 6.09, 0.46, 1.00, 0.65, [
-        ("Flip Matrix", 8.3, True, False),
-        ("116 Suites &", 7.8, False, False),
-        ("Clean Pareto", 7.8, False, False),
+        ("Act 1: Quality", 8.2, True, False),
+        ("12/17 Cfg Flips", 7.6, False, False),
+        ("IVF CPU, graph p99", 7.6, False, False),
     ], fill=DARK_FILL)
     add_box(slide, 6.09, 1.19, 1.00, 0.65, [
-        ("Headroom Bounds", 8.3, True, False),
-        ("(u, Q), Scale", 7.8, False, False),
-        ("& Modality", 7.8, False, False),
+        ("Act 2: Placement", 8.2, True, False),
+        ("4/6 Policy Flips", 7.6, False, False),
+        ("Probe AUC 1.00", 7.6, False, False),
     ], fill=DARK_FILL)
     add_box(slide, 6.09, 1.92, 1.00, 0.65, [
-        ("5-Point Audit", 8.3, True, False),
-        ("Engine Guidelines", 7.8, False, False),
-        ("DynVecAudit", 7.8, False, True),
+        ("Act 3: Pacing", 8.2, True, False),
+        ("+24.4 pp Replay", 7.6, False, False),
+        ("+26.3 pp Live", 7.6, False, False),
     ], fill=DARK_FILL)
 
     # Orthogonal Bus Ch3 -> Ch4

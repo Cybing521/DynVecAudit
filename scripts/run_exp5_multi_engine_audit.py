@@ -2,7 +2,7 @@
 """Exp 5A: 6-Engine Open-Source Lifecycle & Hygiene Benchmark for PVLDB EA&B (DynVecAudit).
 
 Benchmarks 6 independent open-source vector engines under one leakage-free, single-core
-load-gated harness on an isolated Ryzen 9 9950X host:
+load-gated harness on Ryzen-9950X (without modifying external engine packages):
   1. faiss_ivf      (FAISS inverted lists: append / periodic retrain)
   2. hnswlib_mut    (hnswlib single mutable HNSW with markDelete / replace_deleted)
   3. diskann        (FreshDiskANN C++ dynamic memory index)
@@ -37,9 +37,9 @@ THIS_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(THIS_DIR))
 import audit_hygiene as ah  # noqa: E402
 
-EXT_SRC = Path("/workspace/qbam/external")
+EXT_SRC = Path(os.environ.get("DYNVECAUDIT_ENGINES_DIR", str(Path(__file__).resolve().parents[1] / "engines")))
 VENV_PY = EXT_SRC / "venv" / "bin" / "python"
-DATA_BASE = Path("/workspace/qbam/data")
+DATA_BASE = Path(os.environ.get("DYNVECAUDIT_DATA_ROOT", "./data"))
 
 
 def log(msg: str) -> None:
@@ -186,7 +186,7 @@ def build_job_matrix(include_usearch: bool) -> List[Dict[str, Any]]:
                     "bl": bl,
                 })
 
-    # 3. Wikimedia real-timestamp SIFT-128 stream (if present)
+    # 3. Wikimedia real-timestamp SIFT-128 stream on Ryzen-9950X (if present)
     for wtag in ("wikimedia_w1", "wikimedia_w2"):
         for cand in (DATA_BASE / wtag, DATA_BASE / f"sift100k_{wtag}"):
             if (cand / "traces").exists():
@@ -264,7 +264,7 @@ def _resolve_row_status(s: Dict[str, Any], default_status: str) -> str:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="PVLDB Exp 5A 6-Engine Benchmark")
-    ap.add_argument("--work-dir", default="/workspace/pvldb")
+    ap.add_argument("--work-dir", default=os.environ.get("DYNVECAUDIT_ROOT", "."))
     ap.add_argument("--core", type=int, default=8)
     ap.add_argument("--max-load", type=float, default=2.2)
     ap.add_argument("--dry-run", action="store_true")

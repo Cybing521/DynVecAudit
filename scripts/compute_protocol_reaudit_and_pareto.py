@@ -162,13 +162,11 @@ def compute_published_protocol_reaudit() -> Dict[str, Any]:
         "notes": "Multithreaded concurrency changes relative ordering across 40% of pairs (tau=0.200), separating concurrency scaling from single-core algorithmic cost.",
     })
 
-    # 4. Big-ANN 1M->5M Scale Protocol: Mean-Recall >= 0.950 (uncalibrated ef96 passes) vs Att@0.965 >= 95%
+    # 4. Big-ANN 1M->5M->10M Scale Protocol: Mean-Recall (uncalibrated ef96) vs Att@0.965 >= 95%
     s2 = pd.read_csv(RES / "exp9_rust_and_scale" / "s2_scale_1m_to_10m.csv")
     s2_5m = s2[s2["trace"] == "bigann_5m_drift"].set_index("engine")
     engs_5m = ["faiss_ivf", "hnswlib", "usearch_rust", "hnsw_rs"]
-    # Uncalibrated: rank by dyn_wall_s ignoring Att@0.965 (all graphs have ~0.953-0.957 mean recall)
     uncal_5m = [float(s2_5m.loc[e, "dyn_wall_s"]) for e in engs_5m]
-    # Floor-calibrated: only FAISS-IVF np64 achieves 100% Att@0.965 (others 0.0% at ef96)
     cal_5m = [float(s2_5m.loc[e, "dyn_wall_s"]) if float(s2_5m.loc[e, "att_0965_pct"]) >= 95.0 else 1e9 + float(s2_5m.loc[e, "dyn_wall_s"]) for e in engs_5m]
     st5 = _pairwise_stats(engs_5m, uncal_5m, cal_5m, lower_is_better=True)
     rows.append({
@@ -178,6 +176,20 @@ def compute_published_protocol_reaudit() -> Dict[str, Any]:
         **st5,
         "notes": "Fixed ef96 scores 0.9545 mean recall yet 0.0% Att@0.965 at 5M, flipping Top-1 from hnswlib (26.99s) to floor-compliant FAISS-IVF np64 (36.61s).",
     })
+
+    s2_10m = s2[s2["trace"] == "bigann_10m_drift"].set_index("engine")
+    if {"faiss_ivf", "hnswlib", "usearch_rust"}.issubset(set(s2_10m.index)):
+        engs_10m = ["faiss_ivf", "hnswlib", "usearch_rust"]
+        uncal_10m = [float(s2_10m.loc[e, "dyn_wall_s"]) for e in engs_10m]
+        cal_10m = [float(s2_10m.loc[e, "dyn_wall_s"]) if float(s2_10m.loc[e, "att_0965_pct"]) >= 95.0 else 1e9 + float(s2_10m.loc[e, "dyn_wall_s"]) for e in engs_10m]
+        st10 = _pairwise_stats(engs_10m, uncal_10m, cal_10m, lower_is_better=True)
+        rows.append({
+            "benchmark_protocol": "Big-ANN'23 Uncalibrated Fixed-ef Protocol at 10M Scale",
+            "suite": "BigANN-10M Drift (3 engines, 8t)",
+            "ranking_metric": "Dyn Wall (s) [Fixed ef96 vs Floor>=95%]",
+            **st10,
+            "notes": "At 10M scale, fixed ef96 drops to 0.9426-0.9433 mean recall (0.0% Att@0.965 and 0.0% Att@0.950), flipping Top-1 from hnswlib (57.54s) to floor-compliant FAISS-IVF np64 (72.94s, 0.9810 recall).",
+        })
 
     # 5. 1M CRUD-20% (Xeon Core-0): Mean-recall / fixed-np32 vs Floor@0.965 >= 95%
     s1 = pd.read_csv(RES / "exp9_rust_and_scale" / "s1_xeon_1m_gate4_clean.csv")
